@@ -35,7 +35,9 @@ public class JwtService {
         try {
             keyBytes = Decoders.BASE64.decode(properties.secret());
         } catch (RuntimeException ex) {
-            throw new IllegalStateException("app.jwt.secret must be a Base64 encoded string", ex);
+            // An unset JWT_SECRET reaches us as the literal text "${JWT_SECRET}", which is not valid Base64.
+            throw new IllegalStateException(
+                    "app.jwt.secret must be a Base64 encoded string (is the JWT_SECRET environment variable set?)", ex);
         }
         if (keyBytes.length < MIN_KEY_BYTES) {
             throw new IllegalStateException("app.jwt.secret must decode to at least 256 bits (32 bytes)");

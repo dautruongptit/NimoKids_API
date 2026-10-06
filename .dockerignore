@@ -1,0 +1,12 @@
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+*.log
+# secrets never go into an image
+.env
+.env.*
+Dockerfile
+.dockerignore

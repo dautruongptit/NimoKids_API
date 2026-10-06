@@ -1,0 +1,41 @@
+# Production / Docker (SPRING_PROFILES_ACTIVE=prod). Everything secret comes from environment variables and has NO
+# default on purpose: if one is missing the application refuses to start instead of running with a weak value.
+spring:
+  datasource:
+    # DB_HOST is the shared Postgres container (e.g. postgres-main) reached through shared-db-network.
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:nimokids}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+  flyway:
+    # Migrations only. The dev seed (well-known passwords) is never loaded here.
+    locations: classpath:db/migration
+
+server:
+  # The API port is published on 127.0.0.1 only and sits behind nginx / Cloudflare Tunnel, so X-Forwarded-* is trusted.
+  forward-headers-strategy: framework
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+  cors:
+    # Empty = no cross-origin access. The web container proxies /api, so the browser stays same-origin.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  api-log:
+    # Real client IP as set by Cloudflare (the API is not reachable from outside the tunnel).
+    client-ip-header: ${API_LOG_CLIENT_IP_HEADER:CF-Connecting-IP}
+
+# No public API docs in production.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Reserved for later (Redis is planned, not used yet). REDIS_DB follows the project code: NimoKids = 85 -> 5.
+# spring.data.redis.host / port / database will read REDIS_HOST, REDIS_PORT, REDIS_DB when Redis is introduced.
+
+logging:
+  level:
+    root: INFO
+    com.nimokids: INFO

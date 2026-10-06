@@ -7,11 +7,39 @@ spring:
   profiles:
     default: dev
 
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Schema is owned by Flyway; Hibernate only verifies it matches the entities.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  jackson:
+    time-zone: UTC
+    default-property-inclusion: always
+
 server:
-  port: ${SERVER_PORT:8080}
+  # Port standard: NimoKids is project 85, so the API is 8510 everywhere (IDE = container = host).
+  port: ${SERVER_PORT:8510}
+  shutdown: graceful
+
+app:
+  jwt:
+    expiration-minutes: 60
 
 logging:
   pattern:
     level: "%5p [%X{requestId:-}]"
 
-# Common settings. Environment-specific values live in application-dev.yml
+# Settings shared by every profile. Profile specifics: application-dev.yml (local) and application-prod.yml (Docker).
