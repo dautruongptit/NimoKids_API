@@ -2,6 +2,7 @@ package com.nimokids.service;
 
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
+import com.nimokids.dto.request.TimerStartRequest;
 import com.nimokids.dto.request.SubmitTimeoutRequest;
 import com.nimokids.dto.response.AnswerResponse;
 import com.nimokids.dto.response.GameResultResponse;
@@ -22,6 +23,12 @@ public interface GameSessionService {
 
     /** Session state plus the current question, so a refreshed browser can resume a STARTED session. */
     GameSessionResponse getSession(UUID anonymousId, UUID sessionId);
+
+    /**
+     * The client reports that the question audio ended and its countdown started. Idempotent: the first report wins.
+     * The deadline of the question is derived from it, but never later than the cap in GameConstants.
+     */
+    void startTimer(UUID anonymousId, UUID sessionId, TimerStartRequest request);
 
     AnswerResponse submitAnswer(UUID anonymousId, UUID sessionId, SubmitAnswerRequest request);
 

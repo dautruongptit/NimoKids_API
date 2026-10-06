@@ -4,7 +4,6 @@ import com.nimokids.dto.request.ActivityBatchRequest;
 import com.nimokids.entity.AnonymousPlayer;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
-import com.nimokids.entity.QuestionOption;
 import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
 import java.util.UUID;
@@ -19,7 +18,7 @@ public interface ActivityLogService {
             GameSession session,
             Topic topic,
             GameQuestion question,
-            QuestionOption option,
+            UUID optionId,
             Integer durationMs);
 
     /** Stores client-side interaction events (audio, navigation). Server-decided events are rejected. */

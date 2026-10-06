@@ -17,6 +17,7 @@ import com.nimokids.dto.request.ActivityBatchRequest;
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
 import com.nimokids.dto.request.SubmitTimeoutRequest;
+import com.nimokids.dto.request.TimerStartRequest;
 import com.nimokids.dto.response.AnswerResponse;
 import com.nimokids.dto.response.CorrectAnswerResponse;
 import com.nimokids.dto.response.FeedbackResponse;
@@ -84,7 +85,7 @@ class ApiControllersTest {
     void topicsAreReturnedInTheStandardEnvelopeAndEchoTheRequestId() throws Exception {
         UUID requestId = UUID.randomUUID();
         when(topicService.getPlayableTopics()).thenReturn(List.of(new TopicResponse(
-                topicId, "ANIMALS", "Animals", "animals", null, null, null, 1, 5, 1)));
+                topicId, null, "ANIMALS", "Animals", "animals", null, null, null, 1, 5, 1)));
 
         mockMvc.perform(get("/api/v1/topics").header("X-Request-Id", requestId.toString()))
                 .andExpect(status().isOk())
@@ -217,6 +218,30 @@ class ApiControllersTest {
 
         verify(gameSessionService, org.mockito.Mockito.times(2))
                 .submitAnswer(anonymousId, sessionId, new SubmitAnswerRequest(questionId, optionId));
+    }
+
+    @Test
+    void timerStartIsReportedByTheClientWithOnlyTheQuestionId() throws Exception {
+        mockMvc.perform(post("/api/v1/game-sessions/" + sessionId + "/timer-start")
+                        .header(ANONYMOUS_HEADER, anonymousId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionId\":\"" + questionId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.message").value("Timer started"));
+
+        verify(gameSessionService).startTimer(anonymousId, sessionId, new TimerStartRequest(questionId));
+        mockMvc.perform(post("/api/v1/game-sessions/" + sessionId + "/timer-start")
+                        .header(ANONYMOUS_HEADER, anonymousId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.details[?(@.field=='questionId')]").exists());
+        mockMvc.perform(post("/api/v1/game-sessions/" + sessionId + "/timer-start")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionId\":\"" + questionId + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("ANONYMOUS_PLAYER_REQUIRED"));
     }
 
     @Test

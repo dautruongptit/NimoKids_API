@@ -11,13 +11,21 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-/** Question selected for a specific session. Separate from game_questions to keep history consistent. */
+/**
+ * Question selected for a specific session, with the options generated for it. Separate from game_questions so the
+ * history stays consistent when the question bank or the vocabulary changes later.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -47,9 +55,23 @@ public class SessionQuestion extends BaseEntity {
     @Column(name = "question_number", nullable = false, updatable = false)
     private Short questionNumber;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "selected_option_id")
-    private QuestionOption selectedOption;
+    /** The 4 generated, shuffled options. Immutable evidence for scoring (never regenerate or edit). */
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "options_snapshot", nullable = false, updatable = false, columnDefinition = "jsonb")
+    private List<SnapshotOption> optionsSnapshot = new ArrayList<>();
+
+    /** When the server handed this question to the client. */
+    @Column(name = "presented_at")
+    private Instant presentedAt;
+
+    /** When the client reported that the question audio ended (the countdown starts then). */
+    @Column(name = "timer_started_at")
+    private Instant timerStartedAt;
+
+    /** An optionId from {@link #optionsSnapshot}. A plain UUID: there is no options table to point at any more. */
+    @Column(name = "selected_option_id")
+    private UUID selectedOptionId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "result", length = 20)

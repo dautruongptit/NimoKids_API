@@ -3,6 +3,7 @@ package com.nimokids.controller;
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
 import com.nimokids.dto.request.SubmitTimeoutRequest;
+import com.nimokids.dto.request.TimerStartRequest;
 import com.nimokids.dto.response.AnswerResponse;
 import com.nimokids.dto.response.ApiResponse;
 import com.nimokids.dto.response.GameResultResponse;
@@ -40,6 +41,16 @@ public class GameSessionController {
     public ApiResponse<GameSessionResponse> getSession(
             @AnonymousId UUID anonymousId, @PathVariable UUID sessionId) {
         return ApiResponse.success(gameSessionService.getSession(anonymousId, sessionId));
+    }
+
+    /** The question audio has ended and the countdown started (the first report wins). */
+    @PostMapping("/{sessionId}/timer-start")
+    public ApiResponse<Void> startTimer(
+            @AnonymousId UUID anonymousId,
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody TimerStartRequest request) {
+        gameSessionService.startTimer(anonymousId, sessionId, request);
+        return ApiResponse.success("Timer started", null);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.nimokids.service.impl;
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
 import com.nimokids.dto.request.SubmitTimeoutRequest;
+import com.nimokids.dto.request.TimerStartRequest;
 import com.nimokids.dto.response.AnswerResponse;
 import com.nimokids.dto.response.FeedbackResponse;
 import com.nimokids.dto.response.GameResultResponse;
@@ -13,8 +14,8 @@ import com.nimokids.entity.AnonymousPlayer;
 import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
-import com.nimokids.entity.QuestionOption;
 import com.nimokids.entity.SessionQuestion;
+import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
 import com.nimokids.entity.enums.AnswerResult;
@@ -39,10 +40,10 @@ import com.nimokids.repository.GameModeRepository;
 import com.nimokids.repository.GameQuestionRepository;
 import com.nimokids.repository.GameSessionRepository;
 import com.nimokids.repository.PlayerStickerRepository;
-import com.nimokids.repository.QuestionOptionRepository;
 import com.nimokids.repository.TopicRepository;
 import com.nimokids.service.ActivityLogService;
 import com.nimokids.service.GameSessionService;
+import com.nimokids.service.OptionGenerator;
 import com.nimokids.service.PlayerService;
 import com.nimokids.service.StickerService;
 import com.nimokids.util.GameConstants;
@@ -52,23 +53,21 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameSessionServiceImpl implements GameSessionService {
 
     private final GameSessionRepository sessionRepository;
     private final GameQuestionRepository questionRepository;
-    private final QuestionOptionRepository optionRepository;
     private final TopicRepository topicRepository;
     private final GameModeRepository gameModeRepository;
     private final AnonymousPlayerRepository playerRepository;
@@ -76,12 +75,17 @@ public class GameSessionServiceImpl implements GameSessionService {
     private final PlayerService playerService;
     private final StickerService stickerService;
     private final ActivityLogService activityLogService;
+    private final OptionGenerator optionGenerator;
     private final GameMapper mapper;
     private final Clock clock;
 
     // ------------------------------------------------------------------ create
 
-    /** Session and its 5 session_questions are created in one transaction (master 5.4). */
+    /**
+     * One atomic transaction (master 5.1): pick 5 distinct valid questions from the topic SUBTREE, generate and snapshot
+     * the 4 options of each, create the session and its 5 session_questions. Options are generated now, once, so a
+     * refreshed page gets the same options in the same order.
+     */
     @Override
     @Transactional
     public GameSessionResponse createSession(UUID anonymousId, CreateGameSessionRequest request) {
@@ -99,17 +103,17 @@ public class GameSessionServiceImpl implements GameSessionService {
             throw new GameModeNotPlayableException();
         }
 
+        // Choosing a parent topic draws from the parent and every active descendant.
+        List<UUID> subtree = topicRepository.findActiveSubtreeIds(topic.getId());
+        if (subtree.isEmpty()) {
+            throw new TopicNotPlayableException();
+        }
         int age = request.age() == null ? 0 : request.age();
-        List<UUID> candidateIds = new ArrayList<>(questionRepository.findPlayableIds(topic.getId(), mode.getId(), age));
+        List<UUID> candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), age));
         if (candidateIds.size() < GameConstants.QUESTIONS_PER_SESSION) {
             throw new InsufficientQuestionsException();
         }
-
-        // The pool holds distinct ids, so the selected questions are unique within the session (BR-005).
         Collections.shuffle(candidateIds, ThreadLocalRandom.current());
-        List<UUID> selectedIds = candidateIds.subList(0, GameConstants.QUESTIONS_PER_SESSION);
-        Map<UUID, GameQuestion> questionsById = questionRepository.findAllById(selectedIds).stream()
-                .collect(Collectors.toMap(GameQuestion::getId, Function.identity()));
 
         GameSession session = GameSession.builder()
                 .player(player)
@@ -118,16 +122,40 @@ public class GameSessionServiceImpl implements GameSessionService {
                 .totalQuestions((short) GameConstants.QUESTIONS_PER_SESSION)
                 .startedAt(now)
                 .build();
-        for (int i = 0; i < selectedIds.size(); i++) {
+
+        // Candidate ids are distinct, so a question never appears twice. A question whose rules cannot currently produce
+        // 4 distinct options (its pool shrank since it was validated) is skipped and replaced by the next candidate.
+        int accepted = 0;
+        for (UUID candidateId : candidateIds) {
+            if (accepted == GameConstants.QUESTIONS_PER_SESSION) {
+                break;
+            }
+            GameQuestion question = questionRepository.findById(candidateId).orElse(null);
+            if (question == null) {
+                continue;
+            }
+            List<SnapshotOption> options;
+            try {
+                options = optionGenerator.generate(question);
+            } catch (BusinessException ex) {
+                log.warn("Skipping question {}: {}", candidateId, ex.getMessage());
+                continue;
+            }
+            accepted++;
             session.addSessionQuestion(SessionQuestion.builder()
-                    .question(questionsById.get(selectedIds.get(i)))
-                    .questionNumber((short) (i + 1))
+                    .question(question)
+                    .questionNumber((short) accepted)
+                    .optionsSnapshot(options)
+                    .presentedAt(accepted == 1 ? now : null)
                     .build());
+        }
+        if (accepted < GameConstants.QUESTIONS_PER_SESSION) {
+            throw new InsufficientQuestionsException();
         }
         sessionRepository.save(session);
 
         activityLogService.record(ActivityEventType.START_GAME, player, session, topic, null, null, null);
-        return mapper.toSessionResponse(session, questionsById.get(selectedIds.get(0)));
+        return mapper.toSessionResponse(session, currentSessionQuestion(session).orElse(null));
     }
 
     // -------------------------------------------------------------------- read
@@ -136,18 +164,31 @@ public class GameSessionServiceImpl implements GameSessionService {
     @Transactional(readOnly = true)
     public GameSessionResponse getSession(UUID anonymousId, UUID sessionId) {
         GameSession session = loadOwnedSession(anonymousId, sessionId, false);
-        GameQuestion current = session.getStatus() == SessionStatus.STARTED
-                ? currentSessionQuestion(session).map(SessionQuestion::getQuestion).orElse(null)
+        SessionQuestion current = session.getStatus() == SessionStatus.STARTED
+                ? currentSessionQuestion(session).orElse(null)
                 : null;
         return mapper.toSessionResponse(session, current);
+    }
+
+    // ------------------------------------------------------------------- timer
+
+    @Override
+    @Transactional
+    public void startTimer(UUID anonymousId, UUID sessionId, TimerStartRequest request) {
+        GameSession session = loadOwnedSession(anonymousId, sessionId, true);
+        requireStarted(session);
+        SessionQuestion current = requireCurrentUnanswered(session, request.questionId());
+        if (current.getTimerStartedAt() == null) {
+            current.setTimerStartedAt(clock.instant());
+        }
     }
 
     // ------------------------------------------------------------------ answer
 
     /**
-     * Master 5.8: lock and validate the session, validate player/state/question/option/timeout, decide the result,
-     * update session_question, game_session and player statistics, award stickers and write the activity log,
-     * all in one transaction. The row lock on the session serializes concurrent requests.
+     * Master 5.4: lock and validate the session, validate player/state/question/option/timeout, grade against the
+     * options SNAPSHOT, update session_question, game_session and player statistics, award stickers and write the
+     * activity log, all in one transaction. The row lock on the session serializes concurrent requests.
      */
     @Override
     @Transactional
@@ -155,20 +196,20 @@ public class GameSessionServiceImpl implements GameSessionService {
         GameSession session = loadOwnedSession(anonymousId, sessionId, true);
         requireStarted(session);
         SessionQuestion current = requireCurrentUnanswered(session, request.questionId());
-        QuestionOption selected = resolveOption(current.getQuestion(), request.selectedOptionId());
+        SnapshotOption selected = resolveOption(session, current, request.selectedOptionId());
 
         Instant now = clock.instant();
-        Instant startedAt = questionStartedAt(session, current);
+        Instant startedAt = effectiveTimerStart(session, current);
         boolean late = now.isAfter(deadline(startedAt, current.getQuestion()));
 
-        // The server decides the result; an answer that arrives after the deadline counts as TIMEOUT (master 5.5).
+        // The server decides: the snapshot says whether the option is right; an answer after the deadline is a TIMEOUT.
         AnswerResult result = late ? AnswerResult.TIMEOUT : selected.isCorrect() ? AnswerResult.CORRECT : AnswerResult.WRONG;
         return recordResult(session, current, result, late ? null : selected, startedAt, now);
     }
 
     /**
-     * Called by the client when its countdown reaches 0. Recording a timeout earlier than the server deadline
-     * gives the child no advantage (score unchanged, streak reset), so no early-call rejection is needed.
+     * Called by the client when its countdown reaches 0. Recording a timeout earlier than the server deadline gives the
+     * child no advantage (score unchanged, streak reset), so no early-call rejection is needed.
      */
     @Override
     @Transactional
@@ -178,7 +219,7 @@ public class GameSessionServiceImpl implements GameSessionService {
         SessionQuestion current = requireCurrentUnanswered(session, request.questionId());
 
         Instant now = clock.instant();
-        return recordResult(session, current, AnswerResult.TIMEOUT, null, questionStartedAt(session, current), now);
+        return recordResult(session, current, AnswerResult.TIMEOUT, null, effectiveTimerStart(session, current), now);
     }
 
     // ------------------------------------------------------------------ finish
@@ -265,38 +306,65 @@ public class GameSessionServiceImpl implements GameSessionService {
         return sessionQuestion;
     }
 
-    /** INVALID_OPTION when the id does not exist, OPTION_NOT_BELONG_TO_QUESTION when it is another question's option. */
-    private QuestionOption resolveOption(GameQuestion question, UUID optionId) {
-        return question.getOptions().stream()
-                .filter(option -> option.getId().equals(optionId))
+    /**
+     * The submitted option id is looked up in THIS question's snapshot. INVALID_OPTION when it is unknown, and
+     * OPTION_NOT_BELONG_TO_QUESTION when it belongs to another question of the same session.
+     */
+    private static SnapshotOption resolveOption(GameSession session, SessionQuestion current, UUID optionId) {
+        return current.getOptionsSnapshot().stream()
+                .filter(option -> option.optionId().equals(optionId))
                 .findFirst()
-                .orElseThrow(() -> optionRepository.existsById(optionId)
+                .orElseThrow(() -> session.getSessionQuestions().stream()
+                        .filter(other -> other != current)
+                        .anyMatch(other -> other.getOptionsSnapshot().stream().anyMatch(option -> option.optionId().equals(optionId)))
                         ? new OptionNotBelongToQuestionException()
                         : new InvalidOptionException());
     }
 
-    private Optional<SessionQuestion> currentSessionQuestion(GameSession session) {
+    private static Optional<SessionQuestion> currentSessionQuestion(GameSession session) {
         return session.getSessionQuestions().stream()
                 .filter(sq -> sq.getQuestionNumber().intValue() == session.getCurrentQuestionNumber().intValue())
                 .findFirst();
     }
 
     /**
-     * When the child started seeing the question, derived from server data only: question 1 starts with the
-     * session; later questions start once the previous feedback has finished (answered_at + feedback delay).
+     * When the child's countdown really started (master 6.3). The client starts it when the question audio ends and
+     * reports that, but the server never trusts the report alone: the start cannot be later than
+     * "question presented + (feedback pause for questions after the first) + audio length + tolerance".
+     * Without a report, that latest allowed moment is used. So a client cannot gain time by reporting late or never.
      */
-    private static Instant questionStartedAt(GameSession session, SessionQuestion current) {
-        int number = current.getQuestionNumber().intValue();
-        if (number <= 1) {
-            return session.getStartedAt();
+    static Instant effectiveTimerStart(GameSession session, SessionQuestion sessionQuestion) {
+        Instant presentedAt = presentedAt(session, sessionQuestion);
+        long audioMs = 0;
+        var voice = sessionQuestion.getQuestion().getQuestionVoice();
+        if (voice != null && voice.getDurationMs() != null) {
+            audioMs = voice.getDurationMs();
         }
-        return session.getSessionQuestions().stream()
-                .filter(sq -> sq.getQuestionNumber().intValue() == number - 1)
-                .map(SessionQuestion::getAnsweredAt)
-                .filter(answeredAt -> answeredAt != null)
-                .findFirst()
-                .map(answeredAt -> answeredAt.plusMillis(GameConstants.FEEDBACK_DELAY_MS))
-                .orElse(session.getStartedAt());
+        long feedbackMs = sessionQuestion.getQuestionNumber() > 1 ? GameConstants.FEEDBACK_ALLOWANCE_MS : 0;
+        Instant latestStart = presentedAt.plusMillis(feedbackMs + audioMs + GameConstants.TIMER_START_TOLERANCE_MS);
+
+        Instant reported = sessionQuestion.getTimerStartedAt();
+        if (reported == null) {
+            return latestStart;
+        }
+        return reported.isBefore(latestStart) ? reported : latestStart;
+    }
+
+    private static Instant presentedAt(GameSession session, SessionQuestion sessionQuestion) {
+        if (sessionQuestion.getPresentedAt() != null) {
+            return sessionQuestion.getPresentedAt();
+        }
+        // Rows created before presented_at existed: fall back to the previous answer, or the session start.
+        int number = sessionQuestion.getQuestionNumber();
+        if (number > 1) {
+            return session.getSessionQuestions().stream()
+                    .filter(sq -> sq.getQuestionNumber().intValue() == number - 1)
+                    .map(SessionQuestion::getAnsweredAt)
+                    .filter(answeredAt -> answeredAt != null)
+                    .findFirst()
+                    .orElse(session.getStartedAt());
+        }
+        return session.getStartedAt();
     }
 
     private static Instant deadline(Instant startedAt, GameQuestion question) {
@@ -309,12 +377,12 @@ public class GameSessionServiceImpl implements GameSessionService {
             GameSession session,
             SessionQuestion current,
             AnswerResult result,
-            QuestionOption selected,
+            SnapshotOption selected,
             Instant startedAt,
             Instant now) {
         int responseTimeMs = (int) Math.min(Integer.MAX_VALUE, Math.max(0, Duration.between(startedAt, now).toMillis()));
         current.setResult(result);
-        current.setSelectedOption(selected);
+        current.setSelectedOptionId(selected == null ? null : selected.optionId());
         current.setAnsweredAt(now);
         current.setResponseTimeMs(responseTimeMs);
 
@@ -332,17 +400,24 @@ public class GameSessionServiceImpl implements GameSessionService {
                 player.getId(), hasNextQuestion ? 0 : 1, 1, result == AnswerResult.CORRECT ? 1 : 0, now);
 
         activityLogService.record(
-                activityEventFor(result), player, session, session.getTopic(), current.getQuestion(), selected, responseTimeMs);
+                activityEventFor(result), player, session, session.getTopic(), current.getQuestion(),
+                selected == null ? null : selected.optionId(), responseTimeMs);
 
-        QuestionOption correctOption = current.getQuestion().getOptions().stream()
-                .filter(QuestionOption::isCorrect)
+        // The correct option is revealed only now, after the answer has been recorded.
+        SnapshotOption correctOption = current.getOptionsSnapshot().stream()
+                .filter(SnapshotOption::isCorrect)
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Question " + current.getQuestion().getId() + " has no correct option"));
+                .orElseThrow(() -> new IllegalStateException("Snapshot of question " + current.getQuestion().getId() + " has no correct option"));
 
         // currentQuestionNumber has already advanced, so this is the question the child sees next.
-        NextQuestionResponse nextQuestion = hasNextQuestion
-                ? currentSessionQuestion(session).map(mapper::toNextQuestionResponse).orElse(null)
-                : null;
+        NextQuestionResponse nextQuestion = null;
+        if (hasNextQuestion) {
+            SessionQuestion next = currentSessionQuestion(session).orElse(null);
+            if (next != null) {
+                next.setPresentedAt(now);
+                nextQuestion = mapper.toNextQuestionResponse(next);
+            }
+        }
 
         return new AnswerResponse(
                 result,
@@ -355,7 +430,7 @@ public class GameSessionServiceImpl implements GameSessionService {
                 nextQuestion);
     }
 
-    /** Master 5.7: correct +1 score and streak; wrong/timeout keep score and reset streak; score = correct answers. */
+    /** Master 5.5: correct +1 score and streak; wrong/timeout keep score and reset streak; score = correct answers. */
     private static void applyScoring(GameSession session, AnswerResult result) {
         switch (result) {
             case CORRECT -> {

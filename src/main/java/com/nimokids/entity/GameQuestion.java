@@ -1,16 +1,12 @@
 package com.nimokids.entity;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +16,10 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/** Master question bank. Historical sessions reference it through session_questions. */
+/**
+ * Master question bank. A question stores ONE correct answer item and, in {@code metadata.distractor_rules}, the rules
+ * for the three wrong ones. The 4 options are generated when a session starts; they are never stored per question.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -50,6 +49,10 @@ public class GameQuestion extends BaseEntity {
     @JoinColumn(name = "object_sound_id")
     private MediaAsset objectSound;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "correct_answer_item_id", nullable = false)
+    private AnswerItem correctAnswerItem;
+
     @Column(name = "explanation", columnDefinition = "TEXT")
     private String explanation;
 
@@ -64,7 +67,7 @@ public class GameQuestion extends BaseEntity {
 
     @Builder.Default
     @Column(name = "time_limit_seconds", nullable = false)
-    private Short timeLimitSeconds = 5;
+    private Short timeLimitSeconds = 8;
 
     @Builder.Default
     @Column(name = "is_active", nullable = false)
@@ -74,22 +77,9 @@ public class GameQuestion extends BaseEntity {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    private Map<String, Object> metadata;
-
+    /** Contains "distractor_rules": [{"match": {...tags...}, "count": n}, ...]. */
     @Builder.Default
-    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("displayOrder ASC")
-    private List<QuestionOption> options = new ArrayList<>();
-
-    public void addOption(QuestionOption option) {
-        options.add(option);
-        option.setQuestion(this);
-    }
-
-    public void removeOption(QuestionOption option) {
-        options.remove(option);
-        option.setQuestion(null);
-    }
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata", nullable = false, columnDefinition = "jsonb")
+    private Map<String, Object> metadata = new HashMap<>();
 }

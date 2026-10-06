@@ -13,11 +13,12 @@ import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
 import com.nimokids.entity.MediaAsset;
-import com.nimokids.entity.QuestionOption;
 import com.nimokids.entity.SessionQuestion;
+import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Sticker;
 import com.nimokids.entity.Topic;
 import java.time.Instant;
+import java.util.Comparator;
 import org.springframework.stereotype.Component;
 
 /** Entity to DTO mapping only. Contains no business rule. */
@@ -27,6 +28,7 @@ public class GameMapper {
     public TopicResponse toTopicResponse(Topic topic) {
         return new TopicResponse(
                 topic.getId(),
+                topic.getParentTopic() == null ? null : topic.getParentTopic().getId(),
                 topic.getCode(),
                 topic.getName(),
                 topic.getSlug(),
@@ -42,21 +44,25 @@ public class GameMapper {
         return new GameModeResponse(mode.getId(), mode.getCode(), mode.getName(), mode.getDescription());
     }
 
-    /** The question as shown to the child: it never reveals which option is correct. */
-    public QuestionResponse toQuestionResponse(GameQuestion question) {
+    /**
+     * The question as shown to the child, built from the stored options snapshot. {@link OptionResponse} has no
+     * correctness field: the answer is only revealed after it has been recorded.
+     */
+    public QuestionResponse toQuestionResponse(SessionQuestion sessionQuestion) {
+        GameQuestion question = sessionQuestion.getQuestion();
         return new QuestionResponse(
                 question.getId(),
                 question.getQuestionText(),
                 url(question.getQuestionVoice()),
                 url(question.getObjectSound()),
-                question.getOptions().stream()
-                        .map(option -> new OptionResponse(
-                                option.getId(), option.getOptionText(), url(option.getImage()), url(option.getVoice())))
+                sessionQuestion.getOptionsSnapshot().stream()
+                        .sorted(Comparator.comparingInt(SnapshotOption::displayOrder))
+                        .map(option -> new OptionResponse(option.optionId(), option.text(), option.imageUrl(), option.voiceUrl()))
                         .toList());
     }
 
-    /** {@code currentQuestion} is null when the session is no longer STARTED. */
-    public GameSessionResponse toSessionResponse(GameSession session, GameQuestion currentQuestion) {
+    /** {@code current} is null when the session is no longer STARTED. */
+    public GameSessionResponse toSessionResponse(GameSession session, SessionQuestion current) {
         Topic topic = session.getTopic();
         return new GameSessionResponse(
                 session.getSessionId(),
@@ -64,20 +70,19 @@ public class GameMapper {
                 new TopicSummaryResponse(topic.getId(), topic.getName()),
                 session.getTotalQuestions().intValue(),
                 session.getCurrentQuestionNumber().intValue(),
-                currentQuestion == null ? null : currentQuestion.getTimeLimitSeconds().intValue(),
-                currentQuestion == null ? null : toQuestionResponse(currentQuestion));
+                current == null ? null : current.getQuestion().getTimeLimitSeconds().intValue(),
+                current == null ? null : toQuestionResponse(current));
     }
 
     public NextQuestionResponse toNextQuestionResponse(SessionQuestion sessionQuestion) {
-        GameQuestion question = sessionQuestion.getQuestion();
         return new NextQuestionResponse(
                 sessionQuestion.getQuestionNumber().intValue(),
-                question.getTimeLimitSeconds().intValue(),
-                toQuestionResponse(question));
+                sessionQuestion.getQuestion().getTimeLimitSeconds().intValue(),
+                toQuestionResponse(sessionQuestion));
     }
 
-    public CorrectAnswerResponse toCorrectAnswerResponse(QuestionOption option) {
-        return new CorrectAnswerResponse(option.getId(), option.getOptionText(), url(option.getVoice()));
+    public CorrectAnswerResponse toCorrectAnswerResponse(SnapshotOption option) {
+        return new CorrectAnswerResponse(option.optionId(), option.text(), option.voiceUrl());
     }
 
     public StickerResponse toStickerResponse(Sticker sticker, Instant earnedAt) {

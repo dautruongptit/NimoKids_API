@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -49,9 +50,9 @@ public class ActivityLog extends BaseEntity {
     @JoinColumn(name = "question_id")
     private GameQuestion question;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "option_id")
-    private QuestionOption option;
+    /** An optionId from the session question's snapshot (a plain UUID: there is no options table any more). */
+    @Column(name = "option_id")
+    private UUID optionId;
 
     @Column(name = "event_time", nullable = false)
     private Instant eventTime;

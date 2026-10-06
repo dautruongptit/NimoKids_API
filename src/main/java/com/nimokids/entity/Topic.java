@@ -2,7 +2,14 @@ package com.nimokids.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -49,4 +56,15 @@ public class Topic extends BaseEntity {
     @Builder.Default
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
+
+    /** Parent topic (column parent_id), or null for a root. Choosing a root draws questions from its whole subtree. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Topic parentTopic;
+
+    /** Direct children, read-only side of the tree. Loaded lazily; never walk it to find questions (use the subtree query). */
+    @Builder.Default
+    @OneToMany(mappedBy = "parentTopic", fetch = FetchType.LAZY)
+    @OrderBy("displayOrder ASC")
+    private List<Topic> subTopics = new ArrayList<>();
 }

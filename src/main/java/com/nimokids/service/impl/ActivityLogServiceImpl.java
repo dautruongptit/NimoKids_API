@@ -7,7 +7,6 @@ import com.nimokids.entity.ActivityLog;
 import com.nimokids.entity.AnonymousPlayer;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
-import com.nimokids.entity.QuestionOption;
 import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
 import com.nimokids.exception.BusinessException;
@@ -17,7 +16,6 @@ import com.nimokids.exception.SessionNotFoundException;
 import com.nimokids.repository.ActivityLogRepository;
 import com.nimokids.repository.GameQuestionRepository;
 import com.nimokids.repository.GameSessionRepository;
-import com.nimokids.repository.QuestionOptionRepository;
 import com.nimokids.service.ActivityLogService;
 import com.nimokids.service.PlayerService;
 import java.time.Clock;
@@ -51,7 +49,6 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     private final ActivityLogRepository activityLogRepository;
     private final GameSessionRepository sessionRepository;
     private final GameQuestionRepository questionRepository;
-    private final QuestionOptionRepository optionRepository;
     private final PlayerService playerService;
     private final Clock clock;
 
@@ -63,7 +60,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
             GameSession session,
             Topic topic,
             GameQuestion question,
-            QuestionOption option,
+            UUID optionId,
             Integer durationMs) {
         activityLogRepository.save(ActivityLog.builder()
                 .eventType(eventType)
@@ -71,7 +68,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
                 .session(session)
                 .topic(topic)
                 .question(question)
-                .option(option)
+                .optionId(optionId)
                 .durationMs(durationMs)
                 .eventTime(clock.instant())
                 .build());
@@ -92,7 +89,6 @@ public class ActivityLogServiceImpl implements ActivityLogService {
 
         Instant now = clock.instant();
         Map<UUID, GameQuestion> questions = new HashMap<>();
-        Map<UUID, QuestionOption> options = new HashMap<>();
         List<ActivityLog> logs = new ArrayList<>();
         for (ActivityEventRequest event : request.events()) {
             logs.add(ActivityLog.builder()
@@ -103,9 +99,8 @@ public class ActivityLogServiceImpl implements ActivityLogService {
                     .question(event.questionId() == null ? null : questions.computeIfAbsent(event.questionId(),
                             id -> questionRepository.findById(id)
                                     .orElseThrow(() -> new ResourceNotFoundException("Question", id))))
-                    .option(event.optionId() == null ? null : options.computeIfAbsent(event.optionId(),
-                            id -> optionRepository.findById(id)
-                                    .orElseThrow(() -> new ResourceNotFoundException("Option", id))))
+                    // The option id is a snapshot id: there is no table to check it against, and analytics only.
+                    .optionId(event.optionId())
                     .durationMs(event.durationMs())
                     .eventTime(event.eventTime() != null ? event.eventTime() : now)
                     .metadata(event.metadata())

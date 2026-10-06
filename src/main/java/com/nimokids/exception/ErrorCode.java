@@ -20,6 +20,8 @@ public enum ErrorCode {
     QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "Question not found"),
     QUESTION_ALREADY_ANSWERED(HttpStatus.CONFLICT, "Question has already been answered"),
     INVALID_OPTION(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid option"),
+    INSUFFICIENT_DISTRACTORS(HttpStatus.UNPROCESSABLE_ENTITY, "Not enough matching answers to build the options"),
+    INVALID_DISTRACTOR_RULES(HttpStatus.UNPROCESSABLE_ENTITY, "The distractor rules of the question are invalid"),
     OPTION_NOT_BELONG_TO_QUESTION(HttpStatus.UNPROCESSABLE_ENTITY, "Option does not belong to the question"),
     ANSWER_TIMEOUT(HttpStatus.CONFLICT, "Question has already timed out"),
     DUPLICATE_ANSWER(HttpStatus.CONFLICT, "Duplicate or concurrent answer"),

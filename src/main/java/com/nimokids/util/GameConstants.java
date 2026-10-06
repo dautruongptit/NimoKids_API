@@ -7,16 +7,30 @@ public final class GameConstants {
 
     public static final int QUESTIONS_PER_SESSION = 5;
     public static final int MIN_PLAYABLE_QUESTIONS_PER_TOPIC = 5;
-    public static final int DEFAULT_TIME_LIMIT_SECONDS = 5;
+    public static final int DEFAULT_TIME_LIMIT_SECONDS = 8;
+    public static final int OPTIONS_PER_QUESTION = 4;
+    public static final int DISTRACTORS_PER_QUESTION = OPTIONS_PER_QUESTION - 1;
 
-    /** Time the client shows feedback before the next question appears. */
+    /** Pause after the feedback audio before the next question appears (frontend behavior, kept for reference). */
     public static final long FEEDBACK_DELAY_MS = 800;
 
     /**
-     * Tolerance added to the server-side deadline to absorb network latency and clock skew between
-     * the child's device and the server. The client countdown is only a visual aid.
+     * Tolerance added to the server-side deadline to absorb network latency and clock skew between the child's
+     * device and the server. The client countdown is only a visual aid.
      */
     public static final long ANSWER_GRACE_MS = 1000;
+
+    /**
+     * The countdown starts when the question audio ends, which only the client sees. The server therefore never
+     * trusts the reported start blindly: it cannot be later than "question presented + audio length + this tolerance".
+     */
+    public static final long TIMER_START_TOLERANCE_MS = 3000;
+
+    /**
+     * Questions after the first are handed to the client together with the previous answer, then the client plays
+     * the feedback audio and waits {@link #FEEDBACK_DELAY_MS} before showing them. This is the time we allow for that.
+     */
+    public static final long FEEDBACK_ALLOWANCE_MS = 4000;
 
     /** STARTED sessions without activity for this long become ABANDONED (master 5.11). */
     public static final Duration SESSION_INACTIVITY_TIMEOUT = Duration.ofMinutes(30);

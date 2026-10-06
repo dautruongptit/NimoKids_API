@@ -12,18 +12,22 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
 import com.nimokids.dto.request.SubmitTimeoutRequest;
+import com.nimokids.dto.request.TimerStartRequest;
 import com.nimokids.dto.response.AnswerResponse;
 import com.nimokids.dto.response.GameResultResponse;
 import com.nimokids.dto.response.GameSessionResponse;
 import com.nimokids.entity.AnonymousPlayer;
+import com.nimokids.entity.AnswerItem;
 import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
-import com.nimokids.entity.QuestionOption;
+import com.nimokids.entity.MediaAsset;
 import com.nimokids.entity.SessionQuestion;
+import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
 import com.nimokids.entity.enums.AnswerResult;
@@ -31,6 +35,7 @@ import com.nimokids.entity.enums.SessionStatus;
 import com.nimokids.exception.AnswerTimeoutException;
 import com.nimokids.exception.BusinessException;
 import com.nimokids.exception.ErrorCode;
+import com.nimokids.exception.InsufficientDistractorsException;
 import com.nimokids.exception.InsufficientQuestionsException;
 import com.nimokids.exception.InvalidOptionException;
 import com.nimokids.exception.OptionNotBelongToQuestionException;
@@ -46,7 +51,6 @@ import com.nimokids.repository.GameModeRepository;
 import com.nimokids.repository.GameQuestionRepository;
 import com.nimokids.repository.GameSessionRepository;
 import com.nimokids.repository.PlayerStickerRepository;
-import com.nimokids.repository.QuestionOptionRepository;
 import com.nimokids.repository.TopicRepository;
 import com.nimokids.service.impl.GameSessionServiceImpl;
 import java.time.Clock;
@@ -70,7 +74,6 @@ class GameSessionServiceTest {
 
     private final GameSessionRepository sessionRepository = mock(GameSessionRepository.class);
     private final GameQuestionRepository questionRepository = mock(GameQuestionRepository.class);
-    private final QuestionOptionRepository optionRepository = mock(QuestionOptionRepository.class);
     private final TopicRepository topicRepository = mock(TopicRepository.class);
     private final GameModeRepository gameModeRepository = mock(GameModeRepository.class);
     private final AnonymousPlayerRepository playerRepository = mock(AnonymousPlayerRepository.class);
@@ -78,7 +81,9 @@ class GameSessionServiceTest {
     private final PlayerService playerService = mock(PlayerService.class);
     private final StickerService stickerService = mock(StickerService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
+    private final OptionGenerator optionGenerator = mock(OptionGenerator.class);
     private final MutableClock clock = new MutableClock(START);
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     private GameSessionServiceImpl service;
 
@@ -91,8 +96,8 @@ class GameSessionServiceTest {
     @BeforeEach
     void setUp() {
         service = new GameSessionServiceImpl(
-                sessionRepository, questionRepository, optionRepository, topicRepository, gameModeRepository,
-                playerRepository, playerStickerRepository, playerService, stickerService, activityLogService,
+                sessionRepository, questionRepository, topicRepository, gameModeRepository, playerRepository,
+                playerStickerRepository, playerService, stickerService, activityLogService, optionGenerator,
                 new GameMapper(), clock);
 
         anonymousId = UUID.randomUUID();
@@ -113,7 +118,8 @@ class GameSessionServiceTest {
     // ---------------------------------------------------------------- scoring
 
     @Test
-    void correctAnswerAddsScoreAndStreakAndMovesToNextQuestion() {
+    void correctAnswerIsGradedAgainstTheSnapshotAndAddsScoreAndStreak() {
+        startTimer(1);
         clock.advance(Duration.ofSeconds(2));
 
         AnswerResponse response = answer(1, 0);
@@ -123,32 +129,52 @@ class GameSessionServiceTest {
         assertThat(response.score()).isEqualTo(1);
         assertThat(response.currentStreak()).isEqualTo(1);
         assertThat(response.hasNextQuestion()).isTrue();
-        // The next question travels with the answer, so the frontend needs no extra call.
-        assertThat(response.nextQuestion()).isNotNull();
-        assertThat(response.nextQuestion().questionNumber()).isEqualTo(2);
-        assertThat(response.nextQuestion().timeLimitSeconds()).isEqualTo(5);
-        assertThat(response.nextQuestion().question().id()).isEqualTo(question(2).getId());
-        assertThat(response.nextQuestion().question().options()).hasSize(4);
-        assertThat(response.correctAnswer().id()).isEqualTo(question(1).getOptions().get(0).getId());
+        assertThat(response.correctAnswer().id()).isEqualTo(option(1, 0).optionId());
         assertThat(session.getCurrentQuestionNumber()).isEqualTo((short) 2);
         assertThat(session.getStatus()).isEqualTo(SessionStatus.STARTED);
 
         SessionQuestion first = session.getSessionQuestions().get(0);
         assertThat(first.getResult()).isEqualTo(AnswerResult.CORRECT);
-        assertThat(first.getSelectedOption()).isSameAs(question(1).getOptions().get(0));
+        assertThat(first.getSelectedOptionId()).isEqualTo(option(1, 0).optionId());
         assertThat(first.getResponseTimeMs()).isEqualTo(2000);
         verify(playerRepository).addStats(player.getId(), 0, 1, 1, clock.instant());
         verify(activityLogService).record(eq(ActivityEventType.ANSWER_CORRECT), eq(player), eq(session), eq(topic),
-                eq(question(1)), eq(question(1).getOptions().get(0)), eq(2000));
+                eq(question(1)), eq(option(1, 0).optionId()), eq(2000));
+    }
+
+    @Test
+    void theNextQuestionTravelsWithTheAnswerAndRevealsNoCorrectness() throws Exception {
+        startTimer(1);
+        clock.advance(Duration.ofSeconds(2));
+
+        AnswerResponse response = answer(1, 1);
+
+        assertThat(response.nextQuestion()).isNotNull();
+        assertThat(response.nextQuestion().questionNumber()).isEqualTo(2);
+        assertThat(response.nextQuestion().timeLimitSeconds()).isEqualTo(8);
+        assertThat(response.nextQuestion().question().id()).isEqualTo(question(2).getId());
+        assertThat(response.nextQuestion().question().options()).hasSize(4);
+        assertThat(response.nextQuestion().question().options().get(0).id()).isEqualTo(option(2, 0).optionId());
+
+        String nextQuestionJson = objectMapper.writeValueAsString(response.nextQuestion());
+        assertThat(nextQuestionJson).doesNotContainIgnoringCase("correct");
+    }
+
+    @Test
+    void sessionAndQuestionPayloadsNeverCarryACorrectnessFlag() throws Exception {
+        String json = objectMapper.writeValueAsString(service.getSession(anonymousId, session.getSessionId()));
+
+        assertThat(json).doesNotContainIgnoringCase("correct");
+        assertThat(json).contains("\"options\"").contains(option(1, 0).optionId().toString());
     }
 
     @Test
     void wrongAnswerKeepsScoreAndResetsStreakButKeepsMaxStreak() {
-        clock.advance(Duration.ofSeconds(1));
+        startTimer(1);
         answer(1, 0);
-        clock.advance(Duration.ofSeconds(2));
+        startTimer(2);
         answer(2, 0);
-        clock.advance(Duration.ofSeconds(2));
+        startTimer(3);
 
         AnswerResponse response = answer(3, 1);
 
@@ -158,14 +184,15 @@ class GameSessionServiceTest {
         assertThat(response.currentStreak()).isZero();
         assertThat(session.getWrongAnswers()).isEqualTo((short) 1);
         assertThat(session.getMaxStreak()).isEqualTo((short) 2);
-        assertThat(response.correctAnswer().id()).isEqualTo(question(3).getOptions().get(0).getId());
+        assertThat(response.correctAnswer().id()).isEqualTo(option(3, 0).optionId());
     }
 
     @Test
     void timeoutEndpointKeepsScoreAndResetsStreak() {
-        clock.advance(Duration.ofSeconds(1));
+        startTimer(1);
         answer(1, 0);
-        clock.advance(Duration.ofSeconds(6));
+        startTimer(2);
+        clock.advance(Duration.ofSeconds(9));
 
         AnswerResponse response = service.submitTimeout(anonymousId, session.getSessionId(),
                 new SubmitTimeoutRequest(question(2).getId()));
@@ -175,39 +202,102 @@ class GameSessionServiceTest {
         assertThat(response.currentStreak()).isZero();
         assertThat(response.nextQuestion().question().id()).isEqualTo(question(3).getId());
         assertThat(session.getTimeoutAnswers()).isEqualTo((short) 1);
-        assertThat(session.getSessionQuestions().get(1).getSelectedOption()).isNull();
+        assertThat(session.getSessionQuestions().get(1).getSelectedOptionId()).isNull();
+    }
+
+    // ------------------------------------------------------------------- timer
+
+    @Test
+    void theDeadlineIsEightSecondsPlusOneSecondOfGraceAfterTheReportedStart() {
+        startTimer(1);
+        clock.advance(Duration.ofSeconds(9));
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);
     }
 
     @Test
-    void answerArrivingAfterServerDeadlineIsRecordedAsTimeoutEvenIfCorrect() {
-        clock.advance(Duration.ofSeconds(10));
+    void anAnswerAfterTheDeadlineIsATimeoutEvenIfItWasTheRightOne() {
+        startTimer(1);
+        clock.advance(Duration.ofSeconds(9).plusMillis(1));
 
         AnswerResponse response = answer(1, 0);
 
         assertThat(response.result()).isEqualTo(AnswerResult.TIMEOUT);
         assertThat(response.correct()).isFalse();
         assertThat(response.score()).isZero();
-        assertThat(session.getSessionQuestions().get(0).getSelectedOption()).isNull();
+        assertThat(session.getSessionQuestions().get(0).getSelectedOptionId()).isNull();
         verify(playerRepository).addStats(player.getId(), 0, 1, 0, clock.instant());
     }
 
     @Test
-    void deadlineOfLaterQuestionsStartsAfterPreviousFeedback() {
+    void theCountdownOfLaterQuestionsStartsWhenTheClientReportsItNotWhenTheyWereSent() {
+        startTimer(1);
         clock.advance(Duration.ofSeconds(1));
         answer(1, 0);
-        // Question 2 started at t+1.8s, so t+7s is still inside the 5s limit + 1s grace (deadline t+7.8s).
-        clock.advance(Duration.ofSeconds(6));
+        // The client plays feedback audio first; it reports Q2's start 3 seconds after receiving it.
+        clock.advance(Duration.ofSeconds(3));
+        startTimer(2);
+        clock.advance(Duration.ofSeconds(9));
 
-        AnswerResponse response = answer(2, 0);
+        assertThat(answer(2, 0).result()).isEqualTo(AnswerResult.CORRECT);
+    }
 
-        assertThat(response.result()).isEqualTo(AnswerResult.CORRECT);
+    @Test
+    void aClientCannotGainTimeByReportingTheStartLate() {
+        // Question 1 has no audio: the start can be at most presented + 3 s tolerance, however late the report arrives.
+        clock.advance(Duration.ofSeconds(60));
+        startTimer(1);                       // reported a minute late
+        clock.advance(Duration.ofSeconds(1));
+
+        // effective start = START + 3 s, deadline = START + 3 + 8 + 1 = START + 12 s; now = START + 61 s
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.TIMEOUT);
+    }
+
+    @Test
+    void withoutAnyReportTheLatestAllowedStartIsUsed() {
+        clock.advance(Duration.ofSeconds(12));
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);          // START+12 = deadline of START+3+8+1
+
+        startTimer(2);                                                              // keeps the test readable
+        clock.advance(Duration.ofSeconds(9).plusMillis(1));
+        assertThat(answer(2, 0).result()).isEqualTo(AnswerResult.TIMEOUT);
+    }
+
+    @Test
+    void theQuestionAudioLengthIsAddedToTheLatestAllowedStart() {
+        MediaAsset voice = MediaAsset.builder().name("q").storageUrl("https://x/q.mp3").durationMs(5000).build();
+        question(1).setQuestionVoice(voice);
+
+        clock.advance(Duration.ofSeconds(5 + 3 + 8));      // presented + audio + tolerance + limit, still inside the 1 s grace
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);
+    }
+
+    @Test
+    void theFirstTimerReportWinsAndRepeatsAreIgnored() {
+        startTimer(1);
+        Instant first = session.getSessionQuestions().get(0).getTimerStartedAt();
+        clock.advance(Duration.ofSeconds(2));
+
+        startTimer(1);
+
+        assertThat(first).isEqualTo(START);
+        assertThat(session.getSessionQuestions().get(0).getTimerStartedAt()).isEqualTo(first);
+    }
+
+    @Test
+    void theTimerCanOnlyBeStartedForTheCurrentUnansweredQuestion() {
+        assertThatThrownBy(() -> startTimer(3)).isInstanceOf(QuestionNotFoundException.class);
+        startTimer(1);
+        answer(1, 0);
+        assertThatThrownBy(() -> startTimer(1)).isInstanceOf(QuestionAlreadyAnsweredException.class);
+        session.setStatus(SessionStatus.ABANDONED);
+        assertThatThrownBy(() -> startTimer(2)).isInstanceOf(SessionNotActiveException.class);
     }
 
     // ------------------------------------------------------------- validation
 
     @Test
     void duplicateAnswerIsRejectedAndScoreIsNotIncrementedTwice() {
-        clock.advance(Duration.ofSeconds(1));
+        startTimer(1);
         answer(1, 0);
 
         assertThatThrownBy(() -> answer(1, 0)).isInstanceOf(QuestionAlreadyAnsweredException.class);
@@ -218,30 +308,39 @@ class GameSessionServiceTest {
 
     @Test
     void answeringATimedOutQuestionIsRejectedWithAnswerTimeout() {
-        clock.advance(Duration.ofSeconds(6));
+        startTimer(1);
+        clock.advance(Duration.ofSeconds(10));
         service.submitTimeout(anonymousId, session.getSessionId(), new SubmitTimeoutRequest(question(1).getId()));
 
         assertThatThrownBy(() -> answer(1, 0)).isInstanceOf(AnswerTimeoutException.class);
     }
 
     @Test
-    void optionOfAnotherQuestionIsRejected() {
-        UUID foreignOption = question(2).getOptions().get(0).getId();
-        when(optionRepository.existsById(foreignOption)).thenReturn(true);
+    void anOptionOfAnotherQuestionOfTheSessionIsRejected() {
+        startTimer(1);
 
         assertThatThrownBy(() -> service.submitAnswer(anonymousId, session.getSessionId(),
-                new SubmitAnswerRequest(question(1).getId(), foreignOption)))
+                new SubmitAnswerRequest(question(1).getId(), option(2, 0).optionId())))
                 .isInstanceOf(OptionNotBelongToQuestionException.class);
         assertThat(session.getSessionQuestions().get(0).getResult()).isNull();
     }
 
     @Test
-    void unknownOptionIsRejected() {
-        UUID unknown = UUID.randomUUID();
-        when(optionRepository.existsById(unknown)).thenReturn(false);
+    void anOptionThatIsInNoSnapshotIsRejected() {
+        startTimer(1);
 
         assertThatThrownBy(() -> service.submitAnswer(anonymousId, session.getSessionId(),
-                new SubmitAnswerRequest(question(1).getId(), unknown)))
+                new SubmitAnswerRequest(question(1).getId(), UUID.randomUUID())))
+                .isInstanceOf(InvalidOptionException.class);
+    }
+
+    @Test
+    void anAnswerItemIdIsNotAnOptionIdAndIsRejected() {
+        startTimer(1);
+        UUID answerItemId = session.getSessionQuestions().get(0).getOptionsSnapshot().get(0).answerItemId();
+
+        assertThatThrownBy(() -> service.submitAnswer(anonymousId, session.getSessionId(),
+                new SubmitAnswerRequest(question(1).getId(), answerItemId)))
                 .isInstanceOf(InvalidOptionException.class);
     }
 
@@ -265,9 +364,12 @@ class GameSessionServiceTest {
         when(playerService.find(otherAnonymousId)).thenReturn(Optional.of(player(otherAnonymousId)));
 
         assertThatThrownBy(() -> service.submitAnswer(otherAnonymousId, session.getSessionId(),
-                new SubmitAnswerRequest(question(1).getId(), question(1).getOptions().get(0).getId())))
+                new SubmitAnswerRequest(question(1).getId(), option(1, 0).optionId())))
                 .isInstanceOf(SessionNotFoundException.class);
         assertThatThrownBy(() -> service.getSession(otherAnonymousId, session.getSessionId()))
+                .isInstanceOf(SessionNotFoundException.class);
+        assertThatThrownBy(() -> service.startTimer(otherAnonymousId, session.getSessionId(),
+                new TimerStartRequest(question(1).getId())))
                 .isInstanceOf(SessionNotFoundException.class);
         assertThat(session.getScore()).isZero();
     }
@@ -295,6 +397,7 @@ class GameSessionServiceTest {
     @Test
     void fifthAnswerCompletesTheSessionAndRejectsFurtherAnswers() {
         for (int number = 1; number <= 5; number++) {
+            startTimer(number);
             clock.advance(Duration.ofSeconds(1));
             AnswerResponse response = answer(number, 0);
             assertThat(response.hasNextQuestion()).isEqualTo(number < 5);
@@ -322,6 +425,7 @@ class GameSessionServiceTest {
     void resultReportsAccuracyAndCountersAfterCompletion() {
         int[] optionIndexes = {0, 1, 0, 0, 0};
         for (int number = 1; number <= 5; number++) {
+            startTimer(number);
             clock.advance(Duration.ofSeconds(1));
             answer(number, optionIndexes[number - 1]);
         }
@@ -347,27 +451,24 @@ class GameSessionServiceTest {
     }
 
     @Test
-    void getSessionShowsCurrentQuestionWithoutRevealingTheCorrectOption() {
-        clock.advance(Duration.ofSeconds(1));
+    void getSessionResumesWithTheSameOptionsInTheSameOrder() {
+        startTimer(1);
         answer(1, 0);
 
         GameSessionResponse response = service.getSession(anonymousId, session.getSessionId());
 
         assertThat(response.currentQuestionNumber()).isEqualTo(2);
         assertThat(response.question().id()).isEqualTo(question(2).getId());
-        assertThat(response.question().options()).hasSize(4);
-        assertThat(response.timeLimitSeconds()).isEqualTo(5);
+        assertThat(response.timeLimitSeconds()).isEqualTo(8);
+        assertThat(response.question().options()).extracting(o -> o.id())
+                .containsExactly(option(2, 0).optionId(), option(2, 1).optionId(), option(2, 2).optionId(), option(2, 3).optionId());
     }
 
     // ----------------------------------------------------------------- create
 
     @Test
-    void createSessionSelectsFiveUniqueQuestionsNumberedOneToFive() {
-        List<GameQuestion> pool = new ArrayList<>();
-        for (int i = 0; i < 8; i++) {
-            pool.add(newQuestion());
-        }
-        stubCreateDependencies(pool);
+    void createSessionBuildsFiveUniqueQuestionsEachWithItsOwnSnapshot() {
+        List<GameQuestion> pool = stubCreate(8);
 
         GameSessionResponse response = service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
@@ -379,21 +480,64 @@ class GameSessionServiceTest {
         assertThat(created.getSessionQuestions().stream().map(sq -> sq.getQuestionNumber().intValue()).toList())
                 .containsExactly(1, 2, 3, 4, 5);
         Set<UUID> questionIds = new HashSet<>();
-        created.getSessionQuestions().forEach(sq -> questionIds.add(sq.getQuestion().getId()));
+        created.getSessionQuestions().forEach(sq -> {
+            questionIds.add(sq.getQuestion().getId());
+            assertThat(sq.getOptionsSnapshot()).hasSize(4);
+            assertThat(sq.getOptionsSnapshot().stream().filter(SnapshotOption::isCorrect)).hasSize(1);
+        });
         assertThat(questionIds).hasSize(5);
         assertThat(created.getStatus()).isEqualTo(SessionStatus.STARTED);
-        assertThat(created.getTotalQuestions()).isEqualTo((short) 5);
         assertThat(created.getStartedAt()).isEqualTo(START);
+        assertThat(created.getSessionQuestions().get(0).getPresentedAt()).isEqualTo(START);
+        assertThat(created.getSessionQuestions().get(1).getPresentedAt()).isNull();
         assertThat(response.question().id()).isEqualTo(created.getSessionQuestions().get(0).getQuestion().getId());
         assertThat(response.currentQuestionNumber()).isEqualTo(1);
+        assertThat(response.timeLimitSeconds()).isEqualTo(8);
+        assertThat(pool).hasSize(8);
         verify(activityLogService).record(eq(ActivityEventType.START_GAME), eq(player), eq(created), eq(topic),
                 isNull(), isNull(), isNull());
     }
 
     @Test
-    void createSessionNeedsAtLeastFivePlayableQuestions() {
-        List<GameQuestion> pool = List.of(newQuestion(), newQuestion(), newQuestion(), newQuestion());
-        stubCreateDependencies(pool);
+    void createSessionDrawsFromTheWholeTopicSubtree() {
+        List<GameQuestion> pool = stubCreate(6);
+        UUID childTopic = UUID.randomUUID();
+        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId(), childTopic));
+        when(questionRepository.findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), eq(0)))
+                .thenReturn(pool.stream().map(GameQuestion::getId).toList());
+
+        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
+
+        verify(questionRepository).findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), eq(0));
+    }
+
+    @Test
+    void createSessionPassesTheAgeFilterToTheCandidateQuery() {
+        List<GameQuestion> pool = stubCreate(6);
+        when(questionRepository.findCandidateIds(any(), any(), eq(4)))
+                .thenReturn(pool.stream().map(GameQuestion::getId).toList());
+
+        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), 4));
+
+        verify(questionRepository).findCandidateIds(any(), eq(mode.getId()), eq(4));
+    }
+
+    @Test
+    void aQuestionThatCannotProduceOptionsIsSkippedAndReplaced() {
+        List<GameQuestion> pool = stubCreate(7);
+        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        // The first candidate may be any of the 7 after shuffling, so make one specific question always fail.
+        GameSession created = createAndCapture();
+
+        assertThat(created.getSessionQuestions()).hasSize(5);
+        assertThat(created.getSessionQuestions().stream().map(SessionQuestion::getQuestion)).doesNotContain(pool.get(0));
+    }
+
+    @Test
+    void createSessionFailsWhenFewerThanFiveQuestionsCanProduceOptions() {
+        List<GameQuestion> pool = stubCreate(6);
+        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(1))).thenThrow(new InsufficientDistractorsException("pool shrank"));
 
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
@@ -402,10 +546,24 @@ class GameSessionServiceTest {
     }
 
     @Test
-    void createSessionRejectsInactiveTopic() {
-        topic.setActive(false);
-        stubCreateDependencies(List.of());
+    void createSessionNeedsAtLeastFiveCandidateQuestions() {
+        stubCreate(4);
 
+        assertThatThrownBy(() -> service.createSession(
+                anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
+                .isInstanceOf(InsufficientQuestionsException.class);
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    void createSessionRejectsInactiveTopicAndTopicWithoutActiveSubtree() {
+        stubCreate(6);
+        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of());
+        assertThatThrownBy(() -> service.createSession(
+                anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
+                .isInstanceOf(TopicNotPlayableException.class);
+
+        topic.setActive(false);
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
                 .isInstanceOf(TopicNotPlayableException.class);
@@ -413,28 +571,47 @@ class GameSessionServiceTest {
 
     // ------------------------------------------------------------- fixtures
 
-    private void stubCreateDependencies(List<GameQuestion> pool) {
+    private GameSession createAndCapture() {
+        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
+        ArgumentCaptor<GameSession> saved = ArgumentCaptor.forClass(GameSession.class);
+        verify(sessionRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    /** Stubs everything createSession needs and returns the pool of {@code size} candidate questions. */
+    private List<GameQuestion> stubCreate(int size) {
+        List<GameQuestion> pool = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            GameQuestion question = newQuestion();
+            pool.add(question);
+            when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+            when(optionGenerator.generate(question)).thenAnswer(invocation -> newSnapshot());
+        }
         when(playerService.resolveOrCreate(anonymousId)).thenReturn(player);
         when(topicRepository.findById(topic.getId())).thenReturn(Optional.of(topic));
         when(gameModeRepository.findById(mode.getId())).thenReturn(Optional.of(mode));
-        when(questionRepository.findPlayableIds(topic.getId(), mode.getId(), 0))
+        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId()));
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), eq(0)))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
-        when(questionRepository.findAllById(any())).thenAnswer(invocation -> {
-            Iterable<UUID> ids = invocation.getArgument(0);
-            List<GameQuestion> found = new ArrayList<>();
-            ids.forEach(id -> pool.stream().filter(q -> q.getId().equals(id)).findFirst().ifPresent(found::add));
-            return found;
-        });
+        return pool;
+    }
+
+    private void startTimer(int questionNumber) {
+        service.startTimer(anonymousId, session.getSessionId(), new TimerStartRequest(question(questionNumber).getId()));
     }
 
     private AnswerResponse answer(int questionNumber, int optionIndex) {
-        GameQuestion question = question(questionNumber);
         return service.submitAnswer(anonymousId, session.getSessionId(),
-                new SubmitAnswerRequest(question.getId(), question.getOptions().get(optionIndex).getId()));
+                new SubmitAnswerRequest(question(questionNumber).getId(), option(questionNumber, optionIndex).optionId()));
     }
 
     private GameQuestion question(int questionNumber) {
         return session.getSessionQuestions().get(questionNumber - 1).getQuestion();
+    }
+
+    /** Snapshot option {@code optionIndex} (0-based) of question {@code questionNumber}; index 0 is the correct one. */
+    private SnapshotOption option(int questionNumber, int optionIndex) {
+        return session.getSessionQuestions().get(questionNumber - 1).getOptionsSnapshot().get(optionIndex);
     }
 
     private AnonymousPlayer player(UUID anonymousId) {
@@ -450,24 +627,33 @@ class GameSessionServiceTest {
         created.setId(UUID.randomUUID());
         for (int number = 1; number <= 5; number++) {
             created.addSessionQuestion(SessionQuestion.builder()
-                    .question(newQuestion()).questionNumber((short) number).build());
+                    .question(newQuestion())
+                    .questionNumber((short) number)
+                    .optionsSnapshot(newSnapshot())
+                    .presentedAt(number == 1 ? START : null)
+                    .build());
         }
         return created;
     }
 
-    /** A question with 4 options: index 0 is correct, indexes 1-3 are wrong. */
     private GameQuestion newQuestion() {
+        AnswerItem correct = AnswerItem.builder().code("C_" + UUID.randomUUID()).name("Bird").build();
+        correct.setId(UUID.randomUUID());
         GameQuestion question = GameQuestion.builder()
-                .topic(topic).gameMode(mode).questionText("Which animal says Meow?")
+                .topic(topic).gameMode(mode).questionText("Which animal can fly?").correctAnswerItem(correct)
                 .difficulty((short) 1).minAge((short) 1).maxAge((short) 5).build();
         question.setId(UUID.randomUUID());
-        for (int i = 0; i < 4; i++) {
-            QuestionOption option = QuestionOption.builder()
-                    .optionText("Option " + i).correct(i == 0).displayOrder(i + 1).build();
-            option.setId(UUID.randomUUID());
-            question.addOption(option);
-        }
         return question;
+    }
+
+    /** 4 options: index 0 is the correct one, indexes 1-3 are wrong. */
+    private List<SnapshotOption> newSnapshot() {
+        String[] names = {"Bird", "Dog", "Cat", "Cow"};
+        List<SnapshotOption> options = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            options.add(new SnapshotOption(UUID.randomUUID(), UUID.randomUUID(), names[i], null, null, i + 1, i == 0));
+        }
+        return options;
     }
 
     /** Test clock whose time only moves when the test says so. */

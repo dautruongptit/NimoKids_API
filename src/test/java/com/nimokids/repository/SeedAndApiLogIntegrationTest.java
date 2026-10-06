@@ -88,32 +88,6 @@ class SeedAndApiLogIntegrationTest {
     }
 
     @Test
-    void seededTopicsAreBothPlayableWithFivePlayableQuestions() {
-        GameMode mode = gameModeRepository.findByCode("GUESS").orElseThrow();
-        Topic animals = topicRepository.findByCode("ANIMALS").orElseThrow();
-        Topic math = topicRepository.findByCode("MATH").orElseThrow();
-
-        assertThat(questionRepository.findPlayableIds(animals.getId(), mode.getId(), 0)).hasSize(5);
-        assertThat(questionRepository.findPlayableIds(math.getId(), mode.getId(), 0)).hasSize(5);
-        assertThat(questionRepository.findPlayableTopicIds(5)).contains(animals.getId(), math.getId());
-        assertThat(topicRepository.findByActiveTrueOrderByDisplayOrderAsc())
-                .extracting(Topic::getCode).containsSubsequence("ANIMALS", "MATH");
-    }
-
-    @Test
-    void everySeededQuestionHasFourOptionsAndExactlyOneCorrect() {
-        List<GameQuestion> questions = em.createQuery(
-                        "select q from GameQuestion q where q.topic.code in ('ANIMALS', 'MATH')", GameQuestion.class)
-                .getResultList();
-
-        assertThat(questions).hasSize(10);
-        for (GameQuestion question : questions) {
-            assertThat(question.getOptions()).hasSize(4);
-            assertThat(question.getOptions().stream().filter(o -> o.isCorrect()).count()).isEqualTo(1);
-        }
-    }
-
-    @Test
     void seedCreatesThreeStickers() {
         assertThat(stickerRepository.findByCode("FIRST_GAME")).get().extracting(Sticker::getRarity).isEqualTo(StickerRarity.COMMON);
         assertThat(stickerRepository.findByCode("PERFECT_SCORE")).get().extracting(Sticker::getRarity).isEqualTo(StickerRarity.RARE);
