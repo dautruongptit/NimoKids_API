@@ -50,11 +50,16 @@ public class GameMapper {
      */
     public QuestionResponse toQuestionResponse(SessionQuestion sessionQuestion) {
         GameQuestion question = sessionQuestion.getQuestion();
+        // Emoji from the correct answer item's metadata — the large visual above the options.
+        Object emoji = question.getCorrectAnswerItem() != null
+                && question.getCorrectAnswerItem().getMetadata() != null
+                ? question.getCorrectAnswerItem().getMetadata().get("emoji") : null;
         return new QuestionResponse(
                 question.getId(),
                 question.getQuestionText(),
                 url(question.getQuestionVoice()),
                 url(question.getObjectSound()),
+                emoji instanceof String s ? s : null,
                 sessionQuestion.getOptionsSnapshot().stream()
                         .sorted(Comparator.comparingInt(SnapshotOption::displayOrder))
                         .map(option -> new OptionResponse(option.optionId(), option.text(), option.imageUrl(), option.voiceUrl()))
