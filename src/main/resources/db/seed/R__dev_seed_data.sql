@@ -1,16 +1,22 @@
 -- DEVELOPMENT SEED DATA. Loaded only when the dev profile adds classpath:db/seed to the Flyway locations.
--- NEVER ship this to production: it contains well-known passwords (admin / admin123, user / user123).
+-- NEVER ship this to production: it contains well-known passwords (admin123).
 -- Repeatable and idempotent: every insert uses fixed ids or ON CONFLICT DO NOTHING, so re-running is safe.
 
 -- ---------------------------------------------------------------------------
--- Users (bcrypt, cost 10)
+-- Admin accounts. Password is a bcrypt hash (cost 10) of "admin123".
+--   admin@nimokids.local  SUPER_ADMIN  can call every admin API
+--   staff@nimokids.local  ADMIN        lets you see the 403 of a SUPER_ADMIN-only API
 -- ---------------------------------------------------------------------------
-INSERT INTO app_users (id, username, password_hash, role) VALUES
-    ('e0000000-0000-4000-8000-000000000001', 'admin',
-     '$2a$10$6ek66jj7pERrG5Ykaf/OqOMCj.sV3bxhFXWqBmQJzj0ylHuYyZYBG', 'ADMIN'),
-    ('e0000000-0000-4000-8000-000000000002', 'user',
-     '$2a$10$gTE71dWT/0XHMqJoeEMGkOG/qHnf8NrtjKbU9IOHOhm2/ckAJGhaG', 'USER')
+INSERT INTO admin_users (id, email, password_hash, role) VALUES
+    ('e0000000-0000-4000-8000-000000000001', 'admin@nimokids.local',
+     '$2a$10$6ek66jj7pERrG5Ykaf/OqOMCj.sV3bxhFXWqBmQJzj0ylHuYyZYBG', 'SUPER_ADMIN'),
+    ('e0000000-0000-4000-8000-000000000002', 'staff@nimokids.local',
+     '$2a$10$6ek66jj7pERrG5Ykaf/OqOMCj.sV3bxhFXWqBmQJzj0ylHuYyZYBG', 'ADMIN')
 ON CONFLICT DO NOTHING;
+
+-- The account created by earlier seeds had the role ADMIN; the main dev account is a SUPER_ADMIN.
+UPDATE admin_users SET role = 'SUPER_ADMIN'
+WHERE id = 'e0000000-0000-4000-8000-000000000001' AND role <> 'SUPER_ADMIN';
 
 -- ---------------------------------------------------------------------------
 -- Game mode (one generic mode so every topic can be played with it)

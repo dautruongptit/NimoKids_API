@@ -1,9 +1,11 @@
 package com.nimokids.config;
 
+import com.nimokids.security.AuthorityResolver;
 import com.nimokids.security.JwtAuthenticationFilter;
 import com.nimokids.security.JwtProperties;
 import com.nimokids.security.JwtService;
 import com.nimokids.security.SecurityErrorHandler;
+import com.nimokids.security.SecurityPaths;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -11,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -26,19 +29,28 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * Player APIs are anonymous (identified by X-Anonymous-Id, which is NOT authentication). Only the future
- * Admin APIs under /api/v1/admin/** require a valid JWT with role ADMIN. Everything else is denied.
+ * Hybrid authentication:
+ * <ul>
+ *   <li>Players are anonymous. Their endpoints are an explicit allow-list (see {@link SecurityPaths}); they never
+ *       need a JWT and X-Anonymous-Id is only an identifier, NOT authentication.</li>
+ *   <li>POST /api/v1/auth/login is open so an admin can obtain a JWT.</li>
+ *   <li>/api/v1/admin/** requires an authenticated admin (valid JWT): 401 without or with an invalid token.
+ *       WHAT an admin may do is decided per endpoint with {@code @PreAuthorize} (403 when the role is not enough),
+ *       so controllers keep working unchanged when roles become dynamic RBAC.</li>
+ *   <li>Anything not listed is denied, so a new endpoint is never public by accident.</li>
+ * </ul>
+ * Rules are evaluated top to bottom; the first match wins.
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // turns on @PreAuthorize / @PostAuthorize
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
-    private static final String ADMIN_ROLE = "ADMIN";
-
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, JwtService jwtService, SecurityErrorHandler errorHandler) throws Exception {
+            HttpSecurity http, JwtService jwtService, AuthorityResolver authorityResolver, SecurityErrorHandler errorHandler)
+            throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable) // stateless API: no cookies or sessions to protect
                 .cors(Customizer.withDefaults())
@@ -50,12 +62,13 @@ public class SecurityConfig {
                         .authenticationEntryPoint(errorHandler)
                         .accessDeniedHandler(errorHandler))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/admin/**").hasRole(ADMIN_ROLE)
-                        .requestMatchers("/api/v1/**", "/error", "/v3/api-docs/**", "/swagger-ui/**",
-                                "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()          // CORS preflight
+                        .requestMatchers(SecurityPaths.ADMIN_PATTERN).authenticated()
+                        .requestMatchers(HttpMethod.POST, SecurityPaths.LOGIN_PATH).permitAll()
+                        .requestMatchers(SecurityPaths.PUBLIC_PATTERNS).permitAll()
+                        .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().denyAll())
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtService, authorityResolver), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

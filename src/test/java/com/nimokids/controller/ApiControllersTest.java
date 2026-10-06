@@ -36,6 +36,7 @@ import com.nimokids.exception.QuestionAlreadyAnsweredException;
 import com.nimokids.exception.SessionNotFoundException;
 import com.nimokids.security.JwtService;
 import com.nimokids.security.SecurityErrorHandler;
+import com.nimokids.security.StaticRoleAuthorityResolver;
 import com.nimokids.service.ActivityLogService;
 import com.nimokids.service.ApiLogService;
 import com.nimokids.service.GameModeService;
@@ -56,7 +57,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(controllers = {
         TopicController.class, GameModeController.class, GameSessionController.class,
         PlayerController.class, ActivityController.class})
-@Import({SecurityConfig.class, SecurityErrorHandler.class, JwtService.class})
+@Import({SecurityConfig.class, SecurityErrorHandler.class, StaticRoleAuthorityResolver.class, JwtService.class})
 class ApiControllersTest {
 
     private static final String ANONYMOUS_HEADER = "X-Anonymous-Id";
@@ -320,10 +321,17 @@ class ApiControllersTest {
     // ------------------------------------------------- routing, security, CORS
 
     @Test
-    void unknownApiRouteIsResourceNotFound() throws Exception {
-        mockMvc.perform(get("/api/v1/nothing-here"))
+    void unknownRouteInsideAPublicAreaIsResourceNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/topics/a/b/c/d"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void routesThatAreNotOnThePublicListAreDeniedInsteadOfLeakingAs404() throws Exception {
+        mockMvc.perform(get("/api/v1/nothing-here"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
     @Test

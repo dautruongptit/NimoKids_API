@@ -17,6 +17,7 @@ import com.nimokids.controller.TopicController;
 import com.nimokids.exception.SessionNotFoundException;
 import com.nimokids.security.JwtService;
 import com.nimokids.security.SecurityErrorHandler;
+import com.nimokids.security.StaticRoleAuthorityResolver;
 import com.nimokids.service.ApiLogService;
 import com.nimokids.service.GameSessionService;
 import com.nimokids.service.TopicService;
@@ -33,7 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** The filter only gathers data and hands it to the async ApiLogService; it must never affect the response. */
 @WebMvcTest(controllers = {TopicController.class, GameSessionController.class})
-@Import({SecurityConfig.class, SecurityErrorHandler.class, JwtService.class})
+@Import({SecurityConfig.class, SecurityErrorHandler.class, StaticRoleAuthorityResolver.class, JwtService.class})
 class ApiLoggingFilterTest {
 
     @Autowired private MockMvc mockMvc;
@@ -103,10 +104,11 @@ class ApiLoggingFilterTest {
 
     @Test
     void routesWithoutAControllerAreLoggedWithTheirRealPathNotTheCatchAllPattern() throws Exception {
-        mockMvc.perform(get("/api/v1/does-not-exist")).andExpect(status().isNotFound());
+        // /api/v1/media/** is a public area without a controller yet, so the request reaches MVC and gets a 404.
+        mockMvc.perform(get("/api/v1/media/does-not-exist")).andExpect(status().isNotFound());
 
         ApiLogEvent event = capture();
-        assertThat(event.endpoint()).isEqualTo("/api/v1/does-not-exist");
+        assertThat(event.endpoint()).isEqualTo("/api/v1/media/does-not-exist");
         assertThat(event.statusCode()).isEqualTo(404);
         assertThat(event.errorCode()).isEqualTo("RESOURCE_NOT_FOUND");
     }

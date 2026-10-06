@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nimokids.entity.AnonymousPlayer;
 import com.nimokids.entity.ApiLog;
-import com.nimokids.entity.AppUser;
+import com.nimokids.entity.AdminUser;
 import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.Sticker;
 import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.StickerRarity;
-import com.nimokids.entity.enums.UserRole;
+import com.nimokids.entity.enums.AdminRole;
 import com.nimokids.logging.ApiLogEvent;
 import com.nimokids.service.impl.ApiLogServiceImpl;
 import jakarta.persistence.EntityManager;
@@ -40,7 +40,7 @@ class SeedAndApiLogIntegrationTest {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @Autowired private EntityManager em;
-    @Autowired private AppUserRepository userRepository;
+    @Autowired private AdminUserRepository userRepository;
     @Autowired private TopicRepository topicRepository;
     @Autowired private GameModeRepository gameModeRepository;
     @Autowired private GameQuestionRepository questionRepository;
@@ -52,17 +52,39 @@ class SeedAndApiLogIntegrationTest {
     // ------------------------------------------------------------------- seed
 
     @Test
-    void seedCreatesAnAdminAndARegularUserWithBcryptPasswords() {
-        AppUser admin = userRepository.findByUsernameIgnoreCase("admin").orElseThrow();
-        AppUser user = userRepository.findByUsernameIgnoreCase("USER").orElseThrow();
+    void seedCreatesASuperAdminAndAnAdminWithBcryptPasswords() {
+        AdminUser superAdmin = userRepository.findByEmailIgnoreCase("ADMIN@nimokids.local").orElseThrow();
+        AdminUser staff = userRepository.findByEmailIgnoreCase("staff@nimokids.local").orElseThrow();
 
-        assertThat(admin.getRole()).isEqualTo(UserRole.ADMIN);
-        assertThat(admin.isActive()).isTrue();
-        assertThat(admin.getPasswordHash()).startsWith("$2a$10$").doesNotContain("admin123");
-        assertThat(encoder.matches("admin123", admin.getPasswordHash())).isTrue();
-        assertThat(encoder.matches("wrong", admin.getPasswordHash())).isFalse();
-        assertThat(user.getRole()).isEqualTo(UserRole.USER);
-        assertThat(encoder.matches("user123", user.getPasswordHash())).isTrue();
+        assertThat(superAdmin.getEmail()).isEqualTo("admin@nimokids.local");
+        assertThat(superAdmin.getRole()).isEqualTo(AdminRole.SUPER_ADMIN);
+        assertThat(superAdmin.isActive()).isTrue();
+        assertThat(superAdmin.getPasswordHash()).startsWith("$2a$10$").doesNotContain("admin123");
+        assertThat(encoder.matches("admin123", superAdmin.getPasswordHash())).isTrue();
+        assertThat(encoder.matches("wrong", superAdmin.getPasswordHash())).isFalse();
+        assertThat(staff.getRole()).isEqualTo(AdminRole.ADMIN);
+        assertThat(encoder.matches("admin123", staff.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    void adminUsersOnlyAcceptTheKnownRoles() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                em.createNativeQuery("insert into admin_users (email, password_hash, role) values ('player@nimokids.local', 'x', 'USER')").executeUpdate())
+                .hasStackTraceContaining("ck_admin_users_role");
+    }
+
+    @Test
+    void emailMustLookLikeAnEmail() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                em.createNativeQuery("insert into admin_users (email, password_hash, role) values ('no-at-sign', 'x', 'ADMIN')").executeUpdate())
+                .hasStackTraceContaining("ck_admin_users_email_format");
+    }
+
+    @Test
+    void duplicateEmailInADifferentCaseIsRejected() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                em.createNativeQuery("insert into admin_users (email, password_hash, role) values ('ADMIN@NimoKids.Local', 'x', 'ADMIN')").executeUpdate())
+                .hasStackTraceContaining("uk_admin_users_email_lower");
     }
 
     @Test

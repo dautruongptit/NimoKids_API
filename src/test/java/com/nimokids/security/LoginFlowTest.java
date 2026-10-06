@@ -11,15 +11,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimokids.config.SecurityConfig;
-import com.nimokids.config.TimeConfig;
 import com.nimokids.controller.AuthController;
-import com.nimokids.entity.AppUser;
-import com.nimokids.entity.enums.UserRole;
-import com.nimokids.repository.AppUserRepository;
+import com.nimokids.entity.AdminUser;
+import com.nimokids.entity.enums.AdminRole;
+import com.nimokids.repository.AdminUserRepository;
 import com.nimokids.service.ApiLogService;
 import com.nimokids.service.impl.AuthServiceImpl;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,99 +34,101 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Real login service + real JWT + real security rules; only the user table is mocked. */
+/** Real login service + real JWT + real security rules; only the users table is mocked. */
 @WebMvcTest(controllers = {AuthController.class, LoginFlowTest.AdminProbeController.class})
-@Import({SecurityConfig.class, SecurityErrorHandler.class, JwtService.class, TimeConfig.class,
+@Import({SecurityConfig.class, SecurityErrorHandler.class, StaticRoleAuthorityResolver.class, JwtService.class,
         AuthServiceImpl.class, LoginFlowTest.AdminProbeController.class})
 class LoginFlowTest {
+
+    private static final String ADMIN_EMAIL = "admin@nimokids.local";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtService jwtService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private ObjectMapper objectMapper;
-    @MockitoBean private AppUserRepository userRepository;
+    @MockitoBean private AdminUserRepository userRepository;
     @MockitoBean private ApiLogService apiLogService;
 
-    private AppUser admin;
-    private AppUser regular;
+    private AdminUser admin;
 
     @BeforeEach
     void setUp() {
-        admin = user("admin", "admin123", UserRole.ADMIN, true);
-        regular = user("user", "user123", UserRole.USER, true);
-        when(userRepository.findByUsernameIgnoreCase(anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsernameIgnoreCase("admin")).thenReturn(Optional.of(admin));
-        when(userRepository.findByUsernameIgnoreCase("user")).thenReturn(Optional.of(regular));
+        admin = user(ADMIN_EMAIL, "admin123", true);
+        when(userRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL)).thenReturn(Optional.of(admin));
     }
 
     @Test
     void adminLoginReturnsAJwtWithTheRoleClaimThatOpensAdminEndpoints() throws Exception {
-        String token = login("admin", "admin123");
+        String token = login(ADMIN_EMAIL, "admin123");
 
-        assertThat(jwtService.parse(token)).contains(new JwtPrincipal(admin.getId().toString(), "ADMIN"));
+        assertThat(jwtService.parse(token)).contains(new JwtPrincipal(admin.getId().toString(), "SUPER_ADMIN"));
         mockMvc.perform(get("/api/v1/admin/ping").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
-        assertThat(admin.getLastLoginAt()).isNotNull();
     }
 
     @Test
-    void loginResponseDescribesTheTokenAndNeverLeaksTheHash() throws Exception {
+    void loginResponseDescribesTheTokenAndNeverLeaksThePasswordHash() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"admin123\"}"))
+                        .content("{\"email\":\"" + ADMIN_EMAIL + "\",\"password\":\"admin123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.data.expiresInSeconds").value(3600))
-                .andExpect(jsonPath("$.data.username").value("admin"))
-                .andExpect(jsonPath("$.data.role").value("ADMIN"))
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("$2a$"))))
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("passwordHash"))));
+                .andExpect(jsonPath("$.data.email").value(ADMIN_EMAIL))
+                .andExpect(jsonPath("$.data.role").value("SUPER_ADMIN"))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("$2a$"))))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("password"))));
     }
 
     @Test
-    void usernameIsCaseInsensitive() throws Exception {
-        when(userRepository.findByUsernameIgnoreCase("ADMIN")).thenReturn(Optional.of(admin));
+    void emailIsCaseInsensitive() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("ADMIN@NimoKids.LOCAL")).thenReturn(Optional.of(admin));
 
-        assertThat(login("ADMIN", "admin123")).isNotBlank();
+        assertThat(login("ADMIN@NimoKids.LOCAL", "admin123")).isNotBlank();
     }
 
     @Test
-    void regularUserCanLogInButIsForbiddenFromAdminEndpoints() throws Exception {
-        String token = login("user", "user123");
+    void wrongPasswordUnknownEmailAndInactiveAccountAllLookIdentical() throws Exception {
+        AdminUser inactive = user("gone@nimokids.local", "secret1", false);
+        when(userRepository.findByEmailIgnoreCase("gone@nimokids.local")).thenReturn(Optional.of(inactive));
 
-        assertThat(jwtService.parse(token)).contains(new JwtPrincipal(regular.getId().toString(), "USER"));
-        mockMvc.perform(get("/api/v1/admin/ping").header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
-    }
-
-    @Test
-    void wrongPasswordUnknownUserAndInactiveUserAllLookIdentical() throws Exception {
-        AppUser inactive = user("gone", "secret1", UserRole.ADMIN, false);
-        when(userRepository.findByUsernameIgnoreCase("gone")).thenReturn(Optional.of(inactive));
-
-        String[][] attempts = {{"admin", "wrong-password"}, {"nobody", "admin123"}, {"gone", "secret1"}};
+        String[][] attempts = {{ADMIN_EMAIL, "wrong-password"}, {"nobody@nimokids.local", "admin123"}, {"gone@nimokids.local", "secret1"}};
         for (String[] attempt : attempts) {
             mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"username\":\"" + attempt[0] + "\",\"password\":\"" + attempt[1] + "\"}"))
+                            .content(objectMapper.writeValueAsString(Map.of("email", attempt[0], "password", attempt[1]))))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value("ERROR"))
-                    .andExpect(jsonPath("$.message").value("Invalid username or password"))
+                    .andExpect(jsonPath("$.message").value("Invalid email or password"))
                     .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
                     .andExpect(jsonPath("$.data").doesNotExist());
         }
-        assertThat(admin.getLastLoginAt()).isNull();
     }
 
     @Test
     void loginRequestIsValidated() throws Exception {
-        String tooLong = "p".repeat(73);
         mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\" \",\"password\":\"" + tooLong + "\"}"))
+                        .content("{\"email\":\"not-an-email\",\"password\":\"" + "p".repeat(73) + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details[?(@.field=='username')]").exists())
+                .andExpect(jsonPath("$.error.details[?(@.field=='email')]").exists())
                 .andExpect(jsonPath("$.error.details[?(@.field=='password')]").exists());
+
+        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void theOldUsernameFieldIsNoLongerAccepted() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"admin123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.details[?(@.field=='email')]").exists());
+    }
+
+    @Test
+    void onlyPostIsAllowedOnTheLoginUrl() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/login")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -135,19 +138,19 @@ class LoginFlowTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
-    private String login(String username, String password) throws Exception {
+    private String login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(java.util.Map.of("username", username, "password", password))))
+                        .content(objectMapper.writeValueAsString(Map.of("email", email, "password", password))))
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).at("/data/accessToken").asText();
     }
 
-    private AppUser user(String username, String rawPassword, UserRole role, boolean active) {
-        AppUser appUser = AppUser.builder()
-                .username(username).passwordHash(passwordEncoder.encode(rawPassword)).role(role).active(active).build();
-        appUser.setId(UUID.randomUUID());
-        return appUser;
+    private AdminUser user(String email, String rawPassword, boolean active) {
+        AdminUser created = AdminUser.builder()
+                .email(email).passwordHash(passwordEncoder.encode(rawPassword)).role(AdminRole.SUPER_ADMIN).active(active).build();
+        created.setId(UUID.randomUUID());
+        return created;
     }
 
     @RestController
