@@ -17,6 +17,7 @@ import com.nimokids.entity.GameSession;
 import com.nimokids.entity.SessionQuestion;
 import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Topic;
+import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.ActivityEventType;
 import com.nimokids.entity.enums.AnswerResult;
 import com.nimokids.entity.enums.SessionStatus;
@@ -92,24 +93,40 @@ public class GameSessionServiceImpl implements GameSessionService {
         Instant now = clock.instant();
         AnonymousPlayer player = playerService.resolveOrCreate(anonymousId);
 
-        Topic topic = topicRepository.findById(request.topicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Topic", request.topicId()));
-        if (!topic.isActive()) {
-            throw new TopicNotPlayableException();
+        // MIX mode: topicId is null — draw from all active root topics.
+        Topic topic;
+        List<UUID> subtree;
+        if (request.topicId() != null) {
+            topic = topicRepository.findById(request.topicId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Topic", request.topicId()));
+            if (!topic.isActive()) {
+                throw new TopicNotPlayableException();
+            }
+            subtree = topicRepository.findActiveSubtreeIds(topic.getId());
+            if (subtree.isEmpty()) {
+                throw new TopicNotPlayableException();
+            }
+        } else {
+            topic = null;
+            subtree = topicRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
+                    .filter(t -> t.getParentTopic() == null)
+                    .flatMap(t -> topicRepository.findActiveSubtreeIds(t.getId()).stream())
+                    .distinct()
+                    .toList();
+            if (subtree.isEmpty()) {
+                throw new TopicNotPlayableException();
+            }
         }
+
         GameMode mode = gameModeRepository.findById(request.gameModeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Game mode", request.gameModeId()));
         if (!mode.isActive()) {
             throw new GameModeNotPlayableException();
         }
 
-        // Choosing a parent topic draws from the parent and every active descendant.
-        List<UUID> subtree = topicRepository.findActiveSubtreeIds(topic.getId());
-        if (subtree.isEmpty()) {
-            throw new TopicNotPlayableException();
-        }
-        int age = request.age() == null ? 0 : request.age();
-        List<UUID> candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), age));
+        AgeGroup ageGroup = request.resolvedAgeGroup();
+        String[] ageGroups = ageGroup.inheritedGroupNames().toArray(String[]::new);
+        List<UUID> candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), ageGroups));
         if (candidateIds.size() < GameConstants.QUESTIONS_PER_SESSION) {
             throw new InsufficientQuestionsException();
         }
@@ -123,8 +140,6 @@ public class GameSessionServiceImpl implements GameSessionService {
                 .startedAt(now)
                 .build();
 
-        // Candidate ids are distinct, so a question never appears twice. A question whose rules cannot currently produce
-        // 4 distinct options (its pool shrank since it was validated) is skipped and replaced by the next candidate.
         int accepted = 0;
         for (UUID candidateId : candidateIds) {
             if (accepted == GameConstants.QUESTIONS_PER_SESSION) {
@@ -465,9 +480,10 @@ public class GameSessionServiceImpl implements GameSessionService {
         List<StickerResponse> earned = playerStickerRepository.findBySessionId(session.getId()).stream()
                 .map(owned -> mapper.toStickerResponse(owned.getSticker(), owned.getEarnedAt()))
                 .toList();
+        String topicName = session.getTopic() != null ? session.getTopic().getName() : "All Topics";
         return new GameResultResponse(
                 session.getSessionId(),
-                session.getTopic().getName(),
+                topicName,
                 total,
                 session.getCorrectAnswers(),
                 session.getWrongAnswers(),

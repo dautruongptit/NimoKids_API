@@ -45,8 +45,8 @@ public class GameSession extends BaseEntity {
     @JoinColumn(name = "player_id", nullable = false)
     private AnonymousPlayer player;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "topic_id", nullable = false, updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id", updatable = false)
     private Topic topic;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

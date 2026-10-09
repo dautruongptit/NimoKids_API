@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build -----------------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 
 # Dependencies first: this layer is cached until pom.xml changes.
@@ -9,11 +9,11 @@ COPY pom.xml .
 RUN mvn -B -q -DskipTests dependency:go-offline
 
 COPY src ./src
-RUN mvn -B -q -DskipTests package \
+RUN mvn -B -q -Dmaven.test.skip=true package \
     && cp target/nimokids-api-*.jar app.jar
 
 # ---- runtime ---------------------------------------------------------------
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:17-jre
 
 # curl is only used by the HEALTHCHECK.
 RUN apt-get update \

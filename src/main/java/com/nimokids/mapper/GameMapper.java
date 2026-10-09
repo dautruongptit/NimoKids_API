@@ -69,10 +69,13 @@ public class GameMapper {
     /** {@code current} is null when the session is no longer STARTED. */
     public GameSessionResponse toSessionResponse(GameSession session, SessionQuestion current) {
         Topic topic = session.getTopic();
+        TopicSummaryResponse topicSummary = topic != null
+                ? new TopicSummaryResponse(topic.getId(), topic.getName())
+                : new TopicSummaryResponse(null, "All Topics");
         return new GameSessionResponse(
                 session.getSessionId(),
                 session.getStatus(),
-                new TopicSummaryResponse(topic.getId(), topic.getName()),
+                topicSummary,
                 session.getTotalQuestions().intValue(),
                 session.getCurrentQuestionNumber().intValue(),
                 current == null ? null : current.getQuestion().getTimeLimitSeconds().intValue(),

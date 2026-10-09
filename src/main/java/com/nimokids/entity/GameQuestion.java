@@ -1,7 +1,11 @@
 package com.nimokids.entity;
 
+import com.nimokids.entity.enums.AgeGroup;
+import com.nimokids.entity.enums.QuestionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -64,6 +68,18 @@ public class GameQuestion extends BaseEntity {
 
     @Column(name = "max_age", nullable = false)
     private Short maxAge;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "age_group", nullable = false, columnDefinition = "age_group")
+    private AgeGroup ageGroup = AgeGroup.AGE_1_3;
+
+    @Column(name = "question_key", length = 50)
+    private String questionKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_type", length = 30)
+    private QuestionType questionType;
 
     @Builder.Default
     @Column(name = "time_limit_seconds", nullable = false)

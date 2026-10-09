@@ -12,8 +12,11 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
 
     /**
      * Ids of questions that can be asked for a game mode inside a set of topics (a topic subtree): question, game mode
-     * and correct answer item active, the object sound present when the mode needs one, the age range matching when
-     * {@code age} is not 0 (0 = no age filter), and distractor rules present.
+     * and correct answer item active, the object sound present when the mode needs one, the age group matching, and
+     * distractor rules present.
+     *
+     * {@code ageGroups} contains the PostgreSQL enum literals to filter on (e.g. ['AGE_1_3'] or ['AGE_1_3','AGE_4_5']).
+     * An empty collection means no age filter.
      *
      * Whether the distractor pool is really large enough is checked when the options are generated (and on admin
      * save); a question that cannot produce 4 options is skipped and replaced.
@@ -26,14 +29,26 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
             WHERE q.topic_id IN (:topicIds)
               AND q.game_mode_id = :gameModeId
               AND q.is_active = TRUE AND m.is_active = TRUE AND a.is_active = TRUE
-              AND (:age = 0 OR (q.min_age <= :age AND q.max_age >= :age))
+              AND q.age_group = ANY(CAST(:ageGroups AS age_group[]))
               AND (m.code <> :soundModeCode OR q.object_sound_id IS NOT NULL)
               AND jsonb_typeof(q.metadata -> 'distractor_rules') = 'array'
             """, nativeQuery = true)
-    List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, int age, String soundModeCode);
+    List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode);
 
+    default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups) {
+        return findCandidateIds(topicIds, gameModeId, ageGroups, GameConstants.ANIMAL_SOUND_MODE_CODE);
+    }
+
+    /**
+     * Candidates filtered by a single age group (convenience overload for legacy callers).
+     */
     default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, int age) {
-        return findCandidateIds(topicIds, gameModeId, age, GameConstants.ANIMAL_SOUND_MODE_CODE);
+        String[] groups = age == 0
+                ? new String[]{"AGE_1_3", "AGE_4_5"}
+                : age <= 3
+                        ? new String[]{"AGE_1_3"}
+                        : new String[]{"AGE_1_3", "AGE_4_5"};
+        return findCandidateIds(topicIds, gameModeId, groups, GameConstants.ANIMAL_SOUND_MODE_CODE);
     }
 
     /**
