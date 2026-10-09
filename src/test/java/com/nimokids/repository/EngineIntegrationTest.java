@@ -171,9 +171,9 @@ class EngineIntegrationTest {
 
     @Test
     void lookAlikeAnswersAreNeverOfferedAsWrongAnswers() {
-        GameQuestion eggs = em.createQuery("select q from GameQuestion q where q.questionText = 'Which animal lays eggs and has feathers?'",
+        GameQuestion eggs = em.createQuery("select q from GameQuestion q where q.questionText = 'What farm animal lays eggs?'",
                 GameQuestion.class).getSingleResult();
-        GameQuestion sky = em.createQuery("select q from GameQuestion q where q.questionText = 'What color is the sky on a clear day?'",
+        GameQuestion sky = em.createQuery("select q from GameQuestion q where q.questionText = 'What color is the sky?'",
                 GameQuestion.class).getSingleResult();
         for (int run = 0; run < 50; run++) {
             assertThat(optionGenerator.generate(eggs)).extracting(SnapshotOption::text).doesNotContain("Duck");

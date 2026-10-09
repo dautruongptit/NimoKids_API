@@ -6,6 +6,13 @@ import java.time.Duration;
 public final class GameConstants {
 
     public static final int QUESTIONS_PER_SESSION = 5;
+
+    /**
+     * Progressive content inheritance for AGE_4_5: 60 % harder (AGE_4_5) and 40 % easy review (AGE_1_3) questions.
+     * H = AGE_4_5 question, E = AGE_1_3 question, repeated over the candidates. When one pool runs out the other one
+     * fills the slot, so a topic with few AGE_4_5 questions is still playable.
+     */
+    public static final String AGE_4_5_MIX_PATTERN = "HEHEH";
     public static final int MIN_PLAYABLE_QUESTIONS_PER_TOPIC = 5;
     public static final int DEFAULT_TIME_LIMIT_SECONDS = 8;
     public static final int OPTIONS_PER_QUESTION = 4;
@@ -44,6 +51,14 @@ public final class GameConstants {
     public static final String FEEDBACK_CORRECT = "Great job!";
     public static final String FEEDBACK_WRONG = "Try again!";
     public static final String FEEDBACK_TIMEOUT = "Oops! Time's Up!";
+
+    /** Feedback and labels for LanguageMode.VI (full Vietnamese). */
+    public static final String FEEDBACK_CORRECT_VI = "Giỏi lắm!";
+    public static final String FEEDBACK_WRONG_VI = "Thử lại nhé!";
+    public static final String FEEDBACK_TIMEOUT_VI = "Hết giờ rồi!";
+
+    public static final String ALL_TOPICS_EN = "All Topics";
+    public static final String ALL_TOPICS_VI = "Tất cả chủ đề";
 
     private GameConstants() {
     }

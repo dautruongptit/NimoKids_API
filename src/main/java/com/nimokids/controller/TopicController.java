@@ -1,5 +1,7 @@
 package com.nimokids.controller;
 
+import org.springframework.web.bind.annotation.RequestParam;
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.dto.response.ApiResponse;
 import com.nimokids.dto.response.TopicResponse;
 import com.nimokids.service.TopicService;
@@ -19,12 +21,13 @@ public class TopicController {
     private final TopicService topicService;
 
     @GetMapping
-    public ApiResponse<List<TopicResponse>> getTopics() {
-        return ApiResponse.success(topicService.getPlayableTopics());
+    public ApiResponse<List<TopicResponse>> getTopics(@RequestParam(required = false) LanguageMode languageMode) {
+        return ApiResponse.success(topicService.getPlayableTopics(languageMode != null ? languageMode : LanguageMode.EN));
     }
 
     @GetMapping("/{topicId}")
-    public ApiResponse<TopicResponse> getTopic(@PathVariable UUID topicId) {
-        return ApiResponse.success(topicService.getTopic(topicId));
+    public ApiResponse<TopicResponse> getTopic(@PathVariable UUID topicId,
+                                               @RequestParam(required = false) LanguageMode languageMode) {
+        return ApiResponse.success(topicService.getTopic(topicId, languageMode != null ? languageMode : LanguageMode.EN));
     }
 }

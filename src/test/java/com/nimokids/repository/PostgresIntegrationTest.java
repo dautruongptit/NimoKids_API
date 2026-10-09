@@ -1,5 +1,6 @@
 package com.nimokids.repository;
 
+import com.nimokids.entity.enums.AgeGroup;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -38,6 +39,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @EnabledIfEnvironmentVariable(named = "DB_HOST", matches = ".+")
 class PostgresIntegrationTest {
+
+    private static final String[] BOTH_GROUPS = {"AGE_1_3", "AGE_4_5"};
+    private static final String[] YOUNG_GROUP = {"AGE_1_3"};
 
     private static final String SOUND_MODE = "SOUND_FOR_TEST_ONLY";
 
@@ -178,16 +182,17 @@ class PostgresIntegrationTest {
         GameQuestion tooYoung = question(child, mode, correct, rules());
         tooYoung.setMinAge((short) 4);
         tooYoung.setMaxAge((short) 5);
+        tooYoung.setAgeGroup(AgeGroup.AGE_4_5);
         questionRepository.saveAndFlush(tooYoung);
 
         List<UUID> subtree = topicRepository.findActiveSubtreeIds(parent.getId());
 
-        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), 0, SOUND_MODE))
+        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), BOTH_GROUPS, SOUND_MODE))
                 .containsExactlyInAnyOrder(ownQuestion.getId(), childQuestion.getId(), tooYoung.getId());
-        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), 2, SOUND_MODE))
+        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), YOUNG_GROUP, SOUND_MODE))
                 .containsExactlyInAnyOrder(ownQuestion.getId(), childQuestion.getId())
                 .doesNotContain(tooYoung.getId(), otherTopic.getId());
-        assertThat(questionRepository.findCandidateIds(List.of(other.getId()), mode.getId(), 0, SOUND_MODE))
+        assertThat(questionRepository.findCandidateIds(List.of(other.getId()), mode.getId(), BOTH_GROUPS, SOUND_MODE))
                 .containsExactly(otherTopic.getId());
     }
 
@@ -202,7 +207,7 @@ class PostgresIntegrationTest {
                 .assetType(AssetType.ANIMAL_SOUND).name("meow-" + unique()).storageUrl("https://example.invalid/meow.mp3").build()));
         questionRepository.saveAndFlush(withSound);
 
-        assertThat(questionRepository.findCandidateIds(List.of(topic.getId()), mode.getId(), 0, SOUND_MODE))
+        assertThat(questionRepository.findCandidateIds(List.of(topic.getId()), mode.getId(), BOTH_GROUPS, SOUND_MODE))
                 .containsExactly(withSound.getId())
                 .doesNotContain(silent.getId());
     }

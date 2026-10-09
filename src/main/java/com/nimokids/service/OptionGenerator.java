@@ -1,5 +1,6 @@
 package com.nimokids.service;
 
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.SnapshotOption;
 import java.util.List;
@@ -13,5 +14,10 @@ public interface OptionGenerator {
      * @throws com.nimokids.exception.InvalidDistractorRulesException  when the rules are missing or malformed
      * @throws com.nimokids.exception.InsufficientDistractorsException when a rule cannot supply enough distinct items
      */
-    List<SnapshotOption> generate(GameQuestion question);
+    List<SnapshotOption> generate(GameQuestion question, LanguageMode languageMode);
+
+    /** English options (the content of EN and VI_EN). */
+    default List<SnapshotOption> generate(GameQuestion question) {
+        return generate(question, LanguageMode.EN);
+    }
 }

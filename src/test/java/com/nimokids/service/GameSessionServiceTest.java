@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
@@ -30,7 +31,9 @@ import com.nimokids.entity.SessionQuestion;
 import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
+import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.AnswerResult;
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.enums.SessionStatus;
 import com.nimokids.exception.AnswerTimeoutException;
 import com.nimokids.exception.BusinessException;
@@ -503,29 +506,32 @@ class GameSessionServiceTest {
         List<GameQuestion> pool = stubCreate(6);
         UUID childTopic = UUID.randomUUID();
         when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId(), childTopic));
-        when(questionRepository.findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), eq(0)))
+        when(questionRepository.findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), any(String[].class)))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
 
         service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
 
-        verify(questionRepository).findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), eq(0));
+        verify(questionRepository).findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), any(String[].class));
     }
 
     @Test
     void createSessionPassesTheAgeFilterToTheCandidateQuery() {
         List<GameQuestion> pool = stubCreate(6);
-        when(questionRepository.findCandidateIds(any(), any(), eq(4)))
+        // AGE_4_5 reads the two pools separately (60 % AGE_4_5 / 40 % AGE_1_3); here only the AGE_4_5 pool has questions.
+        when(questionRepository.findCandidateIds(any(), any(), argThat((String[] groups) -> groups != null
+                && groups.length == 1 && groups[0].equals("AGE_4_5"))))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
 
-        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), 4));
+        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), AgeGroup.AGE_4_5));
 
-        verify(questionRepository).findCandidateIds(any(), eq(mode.getId()), eq(4));
+        verify(questionRepository).findCandidateIds(any(), eq(mode.getId()), argThat((String[] groups) -> groups != null
+                && groups.length == 1 && groups[0].equals("AGE_1_3")));
     }
 
     @Test
     void aQuestionThatCannotProduceOptionsIsSkippedAndReplaced() {
         List<GameQuestion> pool = stubCreate(7);
-        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(0), LanguageMode.EN)).thenThrow(new InsufficientDistractorsException("pool shrank"));
         // The first candidate may be any of the 7 after shuffling, so make one specific question always fail.
         GameSession created = createAndCapture();
 
@@ -536,8 +542,8 @@ class GameSessionServiceTest {
     @Test
     void createSessionFailsWhenFewerThanFiveQuestionsCanProduceOptions() {
         List<GameQuestion> pool = stubCreate(6);
-        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
-        when(optionGenerator.generate(pool.get(1))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(0), LanguageMode.EN)).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(1), LanguageMode.EN)).thenThrow(new InsufficientDistractorsException("pool shrank"));
 
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
@@ -585,13 +591,13 @@ class GameSessionServiceTest {
             GameQuestion question = newQuestion();
             pool.add(question);
             when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
-            when(optionGenerator.generate(question)).thenAnswer(invocation -> newSnapshot());
+            when(optionGenerator.generate(question, LanguageMode.EN)).thenAnswer(invocation -> newSnapshot());
         }
         when(playerService.resolveOrCreate(anonymousId)).thenReturn(player);
         when(topicRepository.findById(topic.getId())).thenReturn(Optional.of(topic));
         when(gameModeRepository.findById(mode.getId())).thenReturn(Optional.of(mode));
         when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId()));
-        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), eq(0)))
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class)))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
         return pool;
     }

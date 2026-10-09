@@ -1,5 +1,6 @@
 package com.nimokids.service.impl;
 
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.dto.response.TopicResponse;
 import com.nimokids.entity.Topic;
 import com.nimokids.exception.ResourceNotFoundException;
@@ -26,23 +27,23 @@ public class TopicServiceImpl implements TopicService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TopicResponse> getPlayableTopics() {
+    public List<TopicResponse> getPlayableTopics(LanguageMode languageMode) {
         Set<UUID> playableTopicIds = Set.copyOf(
                 questionRepository.findPlayableTopicIds(GameConstants.MIN_PLAYABLE_QUESTIONS_PER_TOPIC));
         return topicRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
                 .filter(topic -> playableTopicIds.contains(topic.getId()))
-                .map(mapper::toTopicResponse)
+                .map(topic -> mapper.toTopicResponse(topic, languageMode))
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public TopicResponse getTopic(UUID topicId) {
+    public TopicResponse getTopic(UUID topicId, LanguageMode languageMode) {
         Topic topic = topicRepository.findById(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic", topicId));
         if (!topic.isActive()) {
             throw new TopicNotPlayableException();
         }
-        return mapper.toTopicResponse(topic);
+        return mapper.toTopicResponse(topic, languageMode);
     }
 }

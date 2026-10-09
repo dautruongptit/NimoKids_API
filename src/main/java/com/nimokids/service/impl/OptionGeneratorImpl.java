@@ -1,5 +1,6 @@
 package com.nimokids.service.impl;
 
+import com.nimokids.entity.enums.LanguageMode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimokids.entity.AnswerItem;
@@ -45,7 +46,7 @@ public class OptionGeneratorImpl implements OptionGenerator {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SnapshotOption> generate(GameQuestion question) {
+    public List<SnapshotOption> generate(GameQuestion question, LanguageMode languageMode) {
         AnswerItem correct = question.getCorrectAnswerItem();
         List<DistractorRule> rules = DistractorRules.parse(question.getMetadata(), GameConstants.DISTRACTORS_PER_QUESTION);
 
@@ -95,7 +96,7 @@ public class OptionGeneratorImpl implements OptionGenerator {
             options.add(new SnapshotOption(
                     UUID.randomUUID(),
                     item.getId(),
-                    item.getName(),
+                    item.nameFor(languageMode),
                     url(item.getImage()),
                     url(item.getVoice()),
                     i + 1,

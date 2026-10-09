@@ -1,5 +1,6 @@
 package com.nimokids.entity;
 
+import com.nimokids.entity.enums.LanguageMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -30,6 +31,20 @@ public class Topic extends BaseEntity {
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
+
+    @Column(name = "name_vi", length = 100)
+    private String nameVi;
+
+    @Column(name = "description_vi", columnDefinition = "TEXT")
+    private String descriptionVi;
+
+    public String nameFor(LanguageMode mode) {
+        return mode.servesVietnamese() && nameVi != null && !nameVi.isBlank() ? nameVi : name;
+    }
+
+    public String descriptionFor(LanguageMode mode) {
+        return mode.servesVietnamese() && descriptionVi != null && !descriptionVi.isBlank() ? descriptionVi : description;
+    }
 
     @Column(name = "slug", nullable = false, unique = true, length = 100)
     private String slug;

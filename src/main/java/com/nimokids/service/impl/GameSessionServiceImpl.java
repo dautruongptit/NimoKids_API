@@ -1,5 +1,6 @@
 package com.nimokids.service.impl;
 
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
 import com.nimokids.dto.request.SubmitTimeoutRequest;
@@ -14,6 +15,7 @@ import com.nimokids.entity.AnonymousPlayer;
 import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
+import com.nimokids.entity.QuestionSnapshot;
 import com.nimokids.entity.SessionQuestion;
 import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Topic;
@@ -125,17 +127,29 @@ public class GameSessionServiceImpl implements GameSessionService {
         }
 
         AgeGroup ageGroup = request.resolvedAgeGroup();
+        LanguageMode languageMode = request.resolvedLanguageMode();
         String[] ageGroups = ageGroup.inheritedGroupNames().toArray(String[]::new);
-        List<UUID> candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), ageGroups));
-        if (candidateIds.size() < GameConstants.QUESTIONS_PER_SESSION) {
-            throw new InsufficientQuestionsException();
+        List<UUID> candidateIds;
+        if (ageGroup == AgeGroup.AGE_4_5) {
+            List<UUID> hard = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_4_5.name()}));
+            List<UUID> easy = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_1_3.name()}));
+            if (hard.size() + easy.size() < GameConstants.QUESTIONS_PER_SESSION) {
+                throw new InsufficientQuestionsException();
+            }
+            candidateIds = mixByAgeGroup(hard, easy);
+        } else {
+            candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), ageGroups));
+            if (candidateIds.size() < GameConstants.QUESTIONS_PER_SESSION) {
+                throw new InsufficientQuestionsException();
+            }
+            Collections.shuffle(candidateIds, ThreadLocalRandom.current());
         }
-        Collections.shuffle(candidateIds, ThreadLocalRandom.current());
 
         GameSession session = GameSession.builder()
                 .player(player)
                 .topic(topic)
                 .gameMode(mode)
+                .languageMode(languageMode)
                 .totalQuestions((short) GameConstants.QUESTIONS_PER_SESSION)
                 .startedAt(now)
                 .build();
@@ -151,7 +165,7 @@ public class GameSessionServiceImpl implements GameSessionService {
             }
             List<SnapshotOption> options;
             try {
-                options = optionGenerator.generate(question);
+                options = optionGenerator.generate(question, languageMode);
             } catch (BusinessException ex) {
                 log.warn("Skipping question {}: {}", candidateId, ex.getMessage());
                 continue;
@@ -161,6 +175,7 @@ public class GameSessionServiceImpl implements GameSessionService {
                     .question(question)
                     .questionNumber((short) accepted)
                     .optionsSnapshot(options)
+                    .questionSnapshot(QuestionSnapshot.of(question, languageMode))
                     .presentedAt(accepted == 1 ? now : null)
                     .build());
         }
@@ -294,6 +309,28 @@ public class GameSessionServiceImpl implements GameSessionService {
             throw new SessionNotFoundException();
         }
         return session;
+    }
+
+    /**
+     * AGE_4_5: orders the candidates so the first questions follow {@link GameConstants#AGE_4_5_MIX_PATTERN}
+     * (60 % AGE_4_5, 40 % AGE_1_3). Each pool is shuffled; a pool that runs out is replaced by the other one.
+     */
+    static List<UUID> mixByAgeGroup(List<UUID> hard, List<UUID> easy) {
+        Collections.shuffle(hard, ThreadLocalRandom.current());
+        Collections.shuffle(easy, ThreadLocalRandom.current());
+        String pattern = GameConstants.AGE_4_5_MIX_PATTERN;
+        List<UUID> mixed = new ArrayList<>(hard.size() + easy.size());
+        int h = 0;
+        int e = 0;
+        for (int slot = 0; h < hard.size() || e < easy.size(); slot++) {
+            boolean wantHard = pattern.charAt(slot % pattern.length()) == 'H';
+            if (wantHard ? h < hard.size() : e >= easy.size()) {
+                mixed.add(hard.get(h++));
+            } else {
+                mixed.add(easy.get(e++));
+            }
+        }
+        return mixed;
     }
 
     private static void requireStarted(GameSession session) {
@@ -440,7 +477,7 @@ public class GameSessionServiceImpl implements GameSessionService {
                 session.getScore(),
                 session.getCurrentStreak(),
                 mapper.toCorrectAnswerResponse(correctOption),
-                new FeedbackResponse(null, feedbackMessage(result)),
+                new FeedbackResponse(null, feedbackMessage(result, session.getLanguageMode())),
                 hasNextQuestion,
                 nextQuestion);
     }
@@ -480,7 +517,9 @@ public class GameSessionServiceImpl implements GameSessionService {
         List<StickerResponse> earned = playerStickerRepository.findBySessionId(session.getId()).stream()
                 .map(owned -> mapper.toStickerResponse(owned.getSticker(), owned.getEarnedAt()))
                 .toList();
-        String topicName = session.getTopic() != null ? session.getTopic().getName() : "All Topics";
+        LanguageMode language = session.getLanguageMode();
+        String topicName = session.getTopic() != null ? session.getTopic().nameFor(language)
+                : (language.servesVietnamese() ? GameConstants.ALL_TOPICS_VI : GameConstants.ALL_TOPICS_EN);
         return new GameResultResponse(
                 session.getSessionId(),
                 topicName,
@@ -503,11 +542,12 @@ public class GameSessionServiceImpl implements GameSessionService {
         };
     }
 
-    private static String feedbackMessage(AnswerResult result) {
+    private static String feedbackMessage(AnswerResult result, LanguageMode language) {
+        boolean vi = language.servesVietnamese();
         return switch (result) {
-            case CORRECT -> GameConstants.FEEDBACK_CORRECT;
-            case WRONG -> GameConstants.FEEDBACK_WRONG;
-            case TIMEOUT -> GameConstants.FEEDBACK_TIMEOUT;
+            case CORRECT -> vi ? GameConstants.FEEDBACK_CORRECT_VI : GameConstants.FEEDBACK_CORRECT;
+            case WRONG -> vi ? GameConstants.FEEDBACK_WRONG_VI : GameConstants.FEEDBACK_WRONG;
+            case TIMEOUT -> vi ? GameConstants.FEEDBACK_TIMEOUT_VI : GameConstants.FEEDBACK_TIMEOUT;
         };
     }
 }

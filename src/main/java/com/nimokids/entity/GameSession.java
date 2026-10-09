@@ -1,5 +1,6 @@
 package com.nimokids.entity;
 
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.enums.SessionStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -84,6 +85,11 @@ public class GameSession extends BaseEntity {
     @Builder.Default
     @Column(name = "max_streak", nullable = false)
     private Short maxStreak = 0;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "language_mode", nullable = false, length = 10)
+    private LanguageMode languageMode = LanguageMode.EN;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

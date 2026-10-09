@@ -1,5 +1,7 @@
 package com.nimokids.mapper;
 
+import com.nimokids.util.GameConstants;
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.dto.response.CorrectAnswerResponse;
 import com.nimokids.dto.response.GameModeResponse;
 import com.nimokids.dto.response.GameSessionResponse;
@@ -13,6 +15,7 @@ import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
 import com.nimokids.entity.MediaAsset;
+import com.nimokids.entity.QuestionSnapshot;
 import com.nimokids.entity.SessionQuestion;
 import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Sticker;
@@ -26,13 +29,17 @@ import org.springframework.stereotype.Component;
 public class GameMapper {
 
     public TopicResponse toTopicResponse(Topic topic) {
+        return toTopicResponse(topic, LanguageMode.EN);
+    }
+
+    public TopicResponse toTopicResponse(Topic topic, LanguageMode language) {
         return new TopicResponse(
                 topic.getId(),
                 topic.getParentTopic() == null ? null : topic.getParentTopic().getId(),
                 topic.getCode(),
-                topic.getName(),
+                topic.nameFor(language),
                 topic.getSlug(),
-                topic.getDescription(),
+                topic.descriptionFor(language),
                 topic.getIconUrl(),
                 topic.getCoverImageUrl(),
                 topic.getMinAge().intValue(),
@@ -50,16 +57,24 @@ public class GameMapper {
      */
     public QuestionResponse toQuestionResponse(SessionQuestion sessionQuestion) {
         GameQuestion question = sessionQuestion.getQuestion();
-        // Emoji from the correct answer item's metadata — the large visual above the options.
-        Object emoji = question.getCorrectAnswerItem() != null
-                && question.getCorrectAnswerItem().getMetadata() != null
-                ? question.getCorrectAnswerItem().getMetadata().get("emoji") : null;
+        QuestionSnapshot frozen = sessionQuestion.getQuestionSnapshot();
+        if (frozen == null) {
+            // Session created before V9: no snapshot, read the live question.
+            Object emoji = question.getCorrectAnswerItem() != null
+                    && question.getCorrectAnswerItem().getMetadata() != null
+                    ? question.getCorrectAnswerItem().getMetadata().get("emoji") : null;
+            frozen = new QuestionSnapshot(question.getQuestionKey(), null, null, 1, null, null,
+                    question.textFor(sessionQuestion.getSession().getLanguageMode()),
+                    url(question.getQuestionVoice()), url(question.getObjectSound()),
+                    emoji instanceof String s ? s : null, null, null, null);
+        }
+        // Everything shown to the child comes from the frozen snapshot (rules 9.7).
         return new QuestionResponse(
                 question.getId(),
-                question.getQuestionText(),
-                url(question.getQuestionVoice()),
-                url(question.getObjectSound()),
-                emoji instanceof String s ? s : null,
+                frozen.questionText(),
+                frozen.questionVoiceUrl(),
+                frozen.objectSoundUrl(),
+                frozen.questionImage(),
                 sessionQuestion.getOptionsSnapshot().stream()
                         .sorted(Comparator.comparingInt(SnapshotOption::displayOrder))
                         .map(option -> new OptionResponse(option.optionId(), option.text(), option.imageUrl(), option.voiceUrl()))
@@ -69,9 +84,11 @@ public class GameMapper {
     /** {@code current} is null when the session is no longer STARTED. */
     public GameSessionResponse toSessionResponse(GameSession session, SessionQuestion current) {
         Topic topic = session.getTopic();
+        LanguageMode language = session.getLanguageMode();
         TopicSummaryResponse topicSummary = topic != null
-                ? new TopicSummaryResponse(topic.getId(), topic.getName())
-                : new TopicSummaryResponse(null, "All Topics");
+                ? new TopicSummaryResponse(topic.getId(), topic.nameFor(language))
+                : new TopicSummaryResponse(null,
+                        language.servesVietnamese() ? GameConstants.ALL_TOPICS_VI : GameConstants.ALL_TOPICS_EN);
         return new GameSessionResponse(
                 session.getSessionId(),
                 session.getStatus(),

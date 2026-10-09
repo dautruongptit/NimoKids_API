@@ -1,5 +1,6 @@
 package com.nimokids.entity;
 
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.QuestionType;
 import jakarta.persistence.Column;
@@ -44,6 +45,14 @@ public class GameQuestion extends BaseEntity {
     @Column(name = "question_text", nullable = false, length = 500)
     private String questionText;
 
+    /** Vietnamese wording; null falls back to {@link #questionText}. */
+    @Column(name = "question_text_vi", length = 500)
+    private String questionTextVi;
+
+    public String textFor(LanguageMode mode) {
+        return mode.servesVietnamese() && questionTextVi != null && !questionTextVi.isBlank() ? questionTextVi : questionText;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_voice_id")
     private MediaAsset questionVoice;
@@ -69,8 +78,10 @@ public class GameQuestion extends BaseEntity {
     @Column(name = "max_age", nullable = false)
     private Short maxAge;
 
+    /** PostgreSQL enum type age_group: bound as a NAMED_ENUM, otherwise Hibernate sends a varchar and the insert fails. */
     @Builder.Default
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "age_group", nullable = false, columnDefinition = "age_group")
     private AgeGroup ageGroup = AgeGroup.AGE_1_3;
 

@@ -1,5 +1,7 @@
 package com.nimokids.controller;
 
+import com.nimokids.entity.enums.AgeGroup;
+import com.nimokids.entity.enums.LanguageMode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -84,7 +86,7 @@ class ApiControllersTest {
     @Test
     void topicsAreReturnedInTheStandardEnvelopeAndEchoTheRequestId() throws Exception {
         UUID requestId = UUID.randomUUID();
-        when(topicService.getPlayableTopics()).thenReturn(List.of(new TopicResponse(
+        when(topicService.getPlayableTopics(LanguageMode.EN)).thenReturn(List.of(new TopicResponse(
                 topicId, null, "ANIMALS", "Animals", "animals", null, null, null, 1, 5, 1)));
 
         mockMvc.perform(get("/api/v1/topics").header("X-Request-Id", requestId.toString()))
@@ -118,13 +120,13 @@ class ApiControllersTest {
         mockMvc.perform(post("/api/v1/game-sessions")
                         .header(ANONYMOUS_HEADER, anonymousId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"topicId\":\"" + topicId + "\",\"gameModeId\":\"" + modeId + "\",\"age\":4}"))
+                        .content("{\"topicId\":\"" + topicId + "\",\"gameModeId\":\"" + modeId + "\",\"ageGroup\":\"AGE_4_5\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.sessionId").value(sessionId.toString()))
                 .andExpect(jsonPath("$.data.status").value("STARTED"));
 
-        verify(gameSessionService).createSession(anonymousId, new CreateGameSessionRequest(topicId, modeId, 4));
+        verify(gameSessionService).createSession(anonymousId, new CreateGameSessionRequest(topicId, modeId, AgeGroup.AGE_4_5));
     }
 
     @Test
@@ -162,12 +164,11 @@ class ApiControllersTest {
         mockMvc.perform(post("/api/v1/game-sessions")
                         .header(ANONYMOUS_HEADER, anonymousId.toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"age\":9}"))
+                        .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details[?(@.field=='topicId')]").exists())
                 .andExpect(jsonPath("$.error.details[?(@.field=='gameModeId')]").exists())
-                .andExpect(jsonPath("$.error.details[?(@.field=='age')]").exists());
+                ;
     }
 
     @Test
@@ -192,7 +193,7 @@ class ApiControllersTest {
         when(gameSessionService.submitAnswer(eq(anonymousId), eq(sessionId), any())).thenReturn(
                 new AnswerResponse(AnswerResult.CORRECT, true, 1, 1,
                         new CorrectAnswerResponse(optionId, "Cat", null), new FeedbackResponse(null, "Great job!"), true,
-                        new NextQuestionResponse(2, 5, new QuestionResponse(questionId, "Which animal can fly?", null, null,
+                        new NextQuestionResponse(2, 5, new QuestionResponse(questionId, "Which animal can fly?", null, null, null,
                                 List.of(new OptionResponse(optionId, "Bird", null, null))))));
 
         mockMvc.perform(post("/api/v1/game-sessions/" + sessionId + "/submit-answer")

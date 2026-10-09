@@ -50,7 +50,7 @@ class ApiLoggingFilterTest {
     @Test
     void successfulRequestIsLoggedWithRouteStatusTimeAndRequestId() throws Exception {
         UUID requestId = UUID.randomUUID();
-        when(topicService.getPlayableTopics()).thenReturn(List.of());
+        when(topicService.getPlayableTopics(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/topics")
                         .header("X-Request-Id", requestId.toString())
@@ -143,7 +143,7 @@ class ApiLoggingFilterTest {
 
     @Test
     void aFailingLogServiceNeverBreaksTheApiResponse() throws Exception {
-        when(topicService.getPlayableTopics()).thenReturn(List.of());
+        when(topicService.getPlayableTopics(any())).thenReturn(List.of());
         doThrow(new IllegalStateException("queue is full")).when(apiLogService).record(any());
 
         mockMvc.perform(get("/api/v1/topics")).andExpect(status().isOk());

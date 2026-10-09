@@ -61,6 +61,11 @@ public class SessionQuestion extends BaseEntity {
     @Column(name = "options_snapshot", nullable = false, updatable = false, columnDefinition = "jsonb")
     private List<SnapshotOption> optionsSnapshot = new ArrayList<>();
 
+    /** The question as the child saw it (text, voice, image, topic, age group, generation rules). Null before V9. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "question_snapshot", updatable = false, columnDefinition = "jsonb")
+    private QuestionSnapshot questionSnapshot;
+
     /** When the server handed this question to the client. */
     @Column(name = "presented_at")
     private Instant presentedAt;

@@ -1,5 +1,6 @@
 package com.nimokids.entity;
 
+import com.nimokids.entity.enums.LanguageMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -38,6 +39,14 @@ public class AnswerItem extends BaseEntity {
     /** The word shown and spoken, e.g. "Bird". */
     @Column(name = "name", nullable = false, length = 100)
     private String name;
+
+    /** Vietnamese word for the item; null falls back to {@link #name}. */
+    @Column(name = "name_vi", length = 100)
+    private String nameVi;
+
+    public String nameFor(LanguageMode mode) {
+        return mode.servesVietnamese() && nameVi != null && !nameVi.isBlank() ? nameVi : name;
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "image_id")
