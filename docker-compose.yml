@@ -1,0 +1,69 @@
+# NimoKids = project 85   ->   Web 8500   API 8510   REDIS_DB=5
+#
+# Run from this folder (the backend repo):
+#   cp .env.example .env        # fill in DB_USER, DB_PASSWORD, JWT_SECRET (and DB_HOST if not postgres-main)
+#   docker network create shared-db-network     # once, if it does not exist yet
+#   docker compose up -d --build                # API only
+#   docker compose --profile web up -d --build  # API + web (needs the website repo next to this one)
+#   docker compose ps                           # nimokids-api should become "healthy"
+#   docker compose logs -f nimokids-api
+#
+# Ports are transparent 1:1 and bound to 127.0.0.1 only (Cloudflare Tunnel / reverse proxy is the way in).
+# Networks:
+#   nimokids-net       project network: web <-> api. The web container is ONLY on this network (cannot see the DB).
+#   shared-db-network  shared infrastructure (postgres-main, redis). Only the API joins it. Must already exist.
+name: nimokids
+
+services:
+  nimokids-api:
+    build:
+      context: .
+    container_name: nimokids-api
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "8510"
+      # Database
+      DB_HOST: ${DB_HOST:-postgres-main}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-nimokids}
+      DB_USER: ${DB_USER:?set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # Required: Base64 secret, at least 256 bits (openssl rand -base64 48). The API refuses to start without it.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      # Empty on purpose: the browser talks to the web container (same origin), not to the API directly.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      API_LOG_CLIENT_IP_HEADER: ${API_LOG_CLIENT_IP_HEADER:-CF-Connecting-IP}
+      # Reserved: the API does not use Redis yet.
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: "5"
+    ports:
+      - "127.0.0.1:8510:8510"
+    networks:
+      - nimokids-net
+      - shared-db-network
+
+  # Optional: the latest frontend (separate repo NimoKids_website, cloned next to this folder).
+  nimokids-web:
+    profiles: ["web"]
+    build:
+      context: ${WEB_CONTEXT:-../NimoKids_website}
+    container_name: nimokids-web
+    restart: unless-stopped
+    environment:
+      PORT: "8500"
+      API_UPSTREAM: ${API_UPSTREAM:-http://nimokids-api:8510}
+    ports:
+      - "127.0.0.1:8500:8500"
+    depends_on:
+      nimokids-api:
+        condition: service_healthy
+    networks:
+      - nimokids-net
+
+networks:
+  nimokids-net:
+    name: nimokids-net
+  shared-db-network:
+    external: true
