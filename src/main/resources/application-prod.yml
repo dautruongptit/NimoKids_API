@@ -10,6 +10,10 @@ spring:
   flyway:
     # Migrations only. The dev seed (well-known passwords) is never loaded here.
     locations: classpath:db/migration
+    # The shared database may also have been used by the dev profile, which records R__dev_seed_data in the history table.
+    # Prod does not ship that file, so tolerate applied-but-missing migrations instead of refusing to start.
+    # (Failed, out-of-order and checksum-changed migrations are still rejected.)
+    ignore-migration-patterns: "*:missing"
 
 server:
   # The API port is published on 127.0.0.1 only and sits behind nginx / Cloudflare Tunnel, so X-Forwarded-* is trusted.
