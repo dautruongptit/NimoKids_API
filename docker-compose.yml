@@ -1,7 +1,7 @@
 # NimoKids = project 85   ->   Web 8500   API 8510   REDIS_DB=5
 #
 # Run from this folder (the backend repo):
-#   cp .env.example .env        # fill in DB_USER, DB_PASSWORD, JWT_SECRET (and DB_HOST if not postgres-main)
+#   cp .env.example .env        # fill in DB_USER, DB_PASSWORD, JWT_SECRET (and DB_HOST if not infra-postgres)
 #   docker network create shared-db-network     # once, if it does not exist yet
 #   docker compose up -d --build                # API only
 #   docker compose --profile web up -d --build  # API + web (needs the website repo next to this one)
@@ -11,7 +11,7 @@
 # Ports are transparent 1:1 and bound to 127.0.0.1 only (Cloudflare Tunnel / reverse proxy is the way in).
 # Networks:
 #   nimokids-net       project network: web <-> api. The web container is ONLY on this network (cannot see the DB).
-#   shared-db-network  shared infrastructure (postgres-main, redis). Only the API joins it. Must already exist.
+#   shared-db-network  shared infrastructure (infra-postgres, infra-redis). Only the API joins it. Must already exist.
 name: nimokids
 
 services:
@@ -24,7 +24,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: "8510"
       # Database
-      DB_HOST: ${DB_HOST:-postgres-main}
+      DB_HOST: ${DB_HOST:-infra-postgres}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-nimokids}
       DB_USER: ${DB_USER:?set DB_USER in .env}
@@ -35,7 +35,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       API_LOG_CLIENT_IP_HEADER: ${API_LOG_CLIENT_IP_HEADER:-CF-Connecting-IP}
       # Reserved: the API does not use Redis yet.
-      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_HOST: ${REDIS_HOST:-infra-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: "5"
     ports:
@@ -44,11 +44,11 @@ services:
       - nimokids-net
       - shared-db-network
 
-  # Optional: the latest frontend (separate repo NimoKids_website, cloned next to this folder).
+  # Optional: the latest frontend (separate repo NimoKids_website, cloned as ../web next to this folder (projects/nimokids/{api,web})).
   nimokids-web:
     profiles: ["web"]
     build:
-      context: ${WEB_CONTEXT:-../NimoKids_website}
+      context: ${WEB_CONTEXT:-../web}
     container_name: nimokids-web
     restart: unless-stopped
     environment:
