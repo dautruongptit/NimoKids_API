@@ -1,6 +1,6 @@
 package com.nimokids.entity;
 
-import com.nimokids.entity.enums.LanguageMode;
+import com.nimokids.service.language.ResolvedQuestion;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,10 +30,13 @@ public record QuestionSnapshot(
         String questionImage,
         UUID correctAnswerItemId,
         String languageMode,
-        Map<String, Object> generation) {
+        Map<String, Object> generation,
+        String templateCode,
+        String instructionLanguage,
+        String answerLanguage) {
 
-    /** Freezes the question as it is now, in the session language. */
-    public static QuestionSnapshot of(GameQuestion question, LanguageMode language) {
+    /** Freezes the question as the child sees it: text and audio already resolved for the session language. */
+    public static QuestionSnapshot of(GameQuestion question, ResolvedQuestion resolved) {
         AnswerItem correct = question.getCorrectAnswerItem();
         Object emoji = correct != null && correct.getMetadata() != null ? correct.getMetadata().get("emoji") : null;
         Map<String, Object> metadata = question.getMetadata() != null ? question.getMetadata() : Map.of();
@@ -51,12 +54,15 @@ public record QuestionSnapshot(
                 question.getDifficulty() != null ? question.getDifficulty().intValue() : 1,
                 question.getTopic() != null ? question.getTopic().getId() : null,
                 question.getTopic() != null ? question.getTopic().getCode() : null,
-                question.textFor(language),
-                question.getQuestionVoice() != null ? question.getQuestionVoice().getStorageUrl() : null,
+                resolved.questionText(),
+                resolved.questionAudioUrl(),
                 question.getObjectSound() != null ? question.getObjectSound().getStorageUrl() : null,
                 emoji instanceof String s ? s : null,
                 correct != null ? correct.getId() : null,
-                language.name(),
-                generation);
+                resolved.languageMode().name(),
+                generation,
+                question.getTemplate() != null ? question.getTemplate().getCode() : null,
+                resolved.instructionLanguage(),
+                resolved.answerLanguage());
     }
 }

@@ -1,6 +1,5 @@
 package com.nimokids.entity;
 
-import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.QuestionType;
 import jakarta.persistence.Column;
@@ -45,13 +44,10 @@ public class GameQuestion extends BaseEntity {
     @Column(name = "question_text", nullable = false, length = 500)
     private String questionText;
 
-    /** Vietnamese wording; null falls back to {@link #questionText}. */
-    @Column(name = "question_text_vi", length = 500)
-    private String questionTextVi;
-
-    public String textFor(LanguageMode mode) {
-        return mode.servesVietnamese() && questionTextVi != null && !questionTextVi.isBlank() ? questionTextVi : questionText;
-    }
+    /** Wording in every language (i18n). The text actually shown is chosen by LanguageResolverService. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "template_id")
+    private QuestionTemplate template;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_voice_id")

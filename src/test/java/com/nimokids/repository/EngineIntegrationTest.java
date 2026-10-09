@@ -25,6 +25,7 @@ import com.nimokids.service.generation.DistractorRules;
 import com.nimokids.service.generation.TagMatcher;
 import com.nimokids.service.impl.ActivityLogServiceImpl;
 import com.nimokids.service.impl.GameSessionServiceImpl;
+import com.nimokids.service.impl.LanguageResolverServiceImpl;
 import com.nimokids.service.impl.OptionGeneratorImpl;
 import com.nimokids.service.impl.PlayerServiceImpl;
 import com.nimokids.service.impl.StickerServiceImpl;
@@ -50,7 +51,8 @@ import org.springframework.context.annotation.Import;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({GameSessionServiceImpl.class, PlayerServiceImpl.class, StickerServiceImpl.class, ActivityLogServiceImpl.class,
-        OptionGeneratorImpl.class, GameMapper.class, TimeConfig.class, JacksonAutoConfiguration.class})
+        OptionGeneratorImpl.class, LanguageResolverServiceImpl.class, GameMapper.class, TimeConfig.class,
+        JacksonAutoConfiguration.class})
 @EnabledIfEnvironmentVariable(named = "DB_HOST", matches = ".+")
 class EngineIntegrationTest {
 

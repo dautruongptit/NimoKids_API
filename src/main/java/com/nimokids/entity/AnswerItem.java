@@ -1,6 +1,5 @@
 package com.nimokids.entity;
 
-import com.nimokids.entity.enums.LanguageMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -40,13 +39,11 @@ public class AnswerItem extends BaseEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    /** Vietnamese word for the item; null falls back to {@link #name}. */
-    @Column(name = "name_vi", length = 100)
-    private String nameVi;
-
-    public String nameFor(LanguageMode mode) {
-        return mode.servesVietnamese() && nameVi != null && !nameVi.isBlank() ? nameVi : name;
-    }
+    /** Text and audio per language: {"vi": {"text": "...", "audio": "..."}, "en": {...}}. */
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "i18n", nullable = false, columnDefinition = "jsonb")
+    private Map<String, Map<String, String>> i18n = new HashMap<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "image_id")

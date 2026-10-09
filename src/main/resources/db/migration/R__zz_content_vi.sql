@@ -1,50 +1,44 @@
--- Vietnamese content for LanguageMode.VI. REPEATABLE and idempotent: it only fills the *_vi columns added by V8,
--- so it is safe in every environment and re-runs whenever this file changes.
+-- Content for the Language Resolver (V10): fills the `i18n` jsonb of question_templates and answer_items.
+-- REPEATABLE and idempotent, so it is safe in every environment and re-runs whenever this file changes.
 --
--- File name starts with "zz" on purpose: Flyway runs repeatable migrations in alphabetical order of their
+-- The file name starts with "zz" on purpose: Flyway runs repeatable migrations in the alphabetical order of their
 -- description, and this one must run AFTER R__dev_seed_data (which creates the rows in dev databases). Rows that do
 -- not exist yet are simply not touched.
 --
--- The translations are a first draft written for toddlers and should be reviewed by a native speaker. NULL / a
--- missing row means "not translated": the API then serves the English text.
+-- Vietnamese texts are a first draft written for toddlers and should be reviewed by a native speaker.
+-- A language without a text is not an error: LanguageResolverService falls back to English.
 
--- Question wording: already authored in game_questions.metadata ->> 'text_vi' by the content seed.
-UPDATE game_questions
-SET question_text_vi = metadata ->> 'text_vi'
-WHERE metadata ->> 'text_vi' IS NOT NULL
-  AND question_text_vi IS DISTINCT FROM (metadata ->> 'text_vi');
+-- 1. Every answer item gets its English text (the canonical name).
+UPDATE answer_items
+SET i18n = jsonb_set(COALESCE(i18n, '{}'::jsonb), '{en}', COALESCE(i18n -> 'en', '{}'::jsonb) || jsonb_build_object('text', name))
+WHERE i18n #>> '{en,text}' IS DISTINCT FROM name;
 
--- Topics
-UPDATE topics t
-SET name_vi = v.name_vi, description_vi = v.description_vi
-FROM (VALUES
-    ('ANIMALS', 'Động vật', 'Gặp gỡ các bạn thú đáng yêu'),
-    ('FRUITS', 'Trái cây', 'Ngọt và mọng nước'),
-    ('VEHICLES', 'Phương tiện', 'Những thứ biết chạy'),
-    ('COLORS', 'Màu sắc', 'Cùng học các màu nào'),
-    ('SHAPES', 'Hình khối', 'Hình tròn, hình vuông và nhiều hơn nữa'),
-    ('NUMBERS', 'Con số', 'Cùng đếm nhé'),
-    ('ALPHABET', 'Chữ cái', 'Học các chữ cái'),
-    ('FOOD', 'Đồ ăn', 'Những món ngon để ăn'),
-    ('TOYS', 'Đồ chơi', 'Đến giờ chơi rồi'),
-    ('CLOTHES', 'Quần áo', 'Chúng ta mặc gì nhỉ?'),
-    ('HOME', 'Ngôi nhà', 'Những đồ vật trong nhà'),
-    ('NATURE', 'Thiên nhiên', 'Nắng, mưa và cây cối'),
-    ('SEA_ANIMALS', 'Động vật biển', 'Cuộc sống dưới đáy biển'),
-    ('FARM_ANIMALS', 'Động vật nông trại', 'Các bạn ở trang trại'),
-    ('VEGETABLES', 'Rau củ', 'Rau củ tốt cho sức khỏe'),
-    ('BODY_PARTS', 'Cơ thể', 'Đầu, vai và nhiều hơn nữa'),
-    ('WEATHER', 'Thời tiết', 'Nắng, mưa, tuyết và gió'),
-    ('FAMILY', 'Gia đình', 'Những người yêu thương con'),
-    ('MUSIC_INSTRUMENTS', 'Âm nhạc', 'Âm thanh và nhịp điệu'),
-    ('DAILY_ACTIVITIES', 'Hoạt động hằng ngày', 'Những việc chúng ta làm mỗi ngày')
-) AS v(code, name_vi, description_vi)
-WHERE t.code = v.code
-  AND (t.name_vi IS DISTINCT FROM v.name_vi OR t.description_vi IS DISTINCT FROM v.description_vi);
+-- 2. Hand-written questions: one CURATED template each, English from question_text, Vietnamese from the content seed
+--    (game_questions.metadata ->> 'text_vi'), then linked through game_questions.template_id.
+INSERT INTO question_templates (code, kind, question_type, age_group, difficulty, i18n)
+SELECT DISTINCT ON (q.question_key)
+       q.question_key, 'CURATED', q.question_type, q.age_group, LEAST(GREATEST(q.difficulty, 1), 3),
+       jsonb_build_object('en', jsonb_build_object('text', q.question_text))
+           || CASE WHEN q.metadata ->> 'text_vi' IS NOT NULL
+                   THEN jsonb_build_object('vi', jsonb_build_object('text', q.metadata ->> 'text_vi'))
+                   ELSE '{}'::jsonb END
+FROM game_questions q
+WHERE q.question_key IS NOT NULL
+ORDER BY q.question_key, q.created_at
+ON CONFLICT (code) DO UPDATE
+    SET i18n = EXCLUDED.i18n, question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group,
+        difficulty = EXCLUDED.difficulty, updated_at = now()
+    WHERE question_templates.kind = 'CURATED' AND question_templates.i18n IS DISTINCT FROM EXCLUDED.i18n;
 
--- Answer items (letters of the alphabet are the same in both languages: name_vi stays NULL = fallback)
+UPDATE game_questions q
+SET template_id = t.id
+FROM question_templates t
+WHERE t.code = q.question_key AND q.template_id IS DISTINCT FROM t.id;
+
+-- 3. Vietnamese answer words (letters of the alphabet are the same in both languages).
 UPDATE answer_items a
-SET name_vi = v.name_vi
+SET i18n = jsonb_set(COALESCE(a.i18n, '{}'::jsonb), '{vi}',
+                     COALESCE(a.i18n -> 'vi', '{}'::jsonb) || jsonb_build_object('text', v.name_vi))
 FROM (VALUES
     ('ANIMALS_CAT', 'Con mèo'),
     ('ANIMALS_DOG', 'Con chó'),
@@ -266,7 +260,45 @@ FROM (VALUES
     ('DAILY_DRESSING', 'Mặc quần áo'),
     ('DAILY_WASHING_HANDS', 'Rửa tay'),
     ('DAILY_SINGING', 'Hát'),
-    ('DAILY_COOKING', 'Nấu ăn')
+    ('DAILY_COOKING', 'Nấu ăn'),
+    ('ALPHABET_A', 'A'),
+    ('ALPHABET_B', 'B'),
+    ('ALPHABET_C', 'C'),
+    ('ALPHABET_D', 'D'),
+    ('ALPHABET_E', 'E'),
+    ('ALPHABET_F', 'F'),
+    ('ALPHABET_G', 'G'),
+    ('ALPHABET_H', 'H'),
+    ('ALPHABET_I', 'I'),
+    ('ALPHABET_J', 'J')
 ) AS v(code, name_vi)
 WHERE a.code = v.code
-  AND a.name_vi IS DISTINCT FROM v.name_vi;
+  AND a.i18n #>> '{vi,text}' IS DISTINCT FROM v.name_vi;
+
+-- 4. Topics (not part of the question / answer i18n): Vietnamese name and description columns.
+UPDATE topics t
+SET name_vi = v.name_vi, description_vi = v.description_vi
+FROM (VALUES
+    ('ANIMALS', 'Động vật', 'Gặp gỡ các bạn thú đáng yêu'),
+    ('FRUITS', 'Trái cây', 'Ngọt và mọng nước'),
+    ('VEHICLES', 'Phương tiện', 'Những thứ biết chạy'),
+    ('COLORS', 'Màu sắc', 'Cùng học các màu nào'),
+    ('SHAPES', 'Hình khối', 'Hình tròn, hình vuông và nhiều hơn nữa'),
+    ('NUMBERS', 'Con số', 'Cùng đếm nhé'),
+    ('ALPHABET', 'Chữ cái', 'Học các chữ cái'),
+    ('FOOD', 'Đồ ăn', 'Những món ngon để ăn'),
+    ('TOYS', 'Đồ chơi', 'Đến giờ chơi rồi'),
+    ('CLOTHES', 'Quần áo', 'Chúng ta mặc gì nhỉ?'),
+    ('HOME', 'Ngôi nhà', 'Những đồ vật trong nhà'),
+    ('NATURE', 'Thiên nhiên', 'Nắng, mưa và cây cối'),
+    ('SEA_ANIMALS', 'Động vật biển', 'Cuộc sống dưới đáy biển'),
+    ('FARM_ANIMALS', 'Động vật nông trại', 'Các bạn ở trang trại'),
+    ('VEGETABLES', 'Rau củ', 'Rau củ tốt cho sức khỏe'),
+    ('BODY_PARTS', 'Cơ thể', 'Đầu, vai và nhiều hơn nữa'),
+    ('WEATHER', 'Thời tiết', 'Nắng, mưa, tuyết và gió'),
+    ('FAMILY', 'Gia đình', 'Những người yêu thương con'),
+    ('MUSIC_INSTRUMENTS', 'Âm nhạc', 'Âm thanh và nhịp điệu'),
+    ('DAILY_ACTIVITIES', 'Hoạt động hằng ngày', 'Những việc chúng ta làm mỗi ngày')
+) AS v(code, name_vi, description_vi)
+WHERE t.code = v.code
+  AND (t.name_vi IS DISTINCT FROM v.name_vi OR t.description_vi IS DISTINCT FROM v.description_vi);

@@ -1,5 +1,7 @@
 package com.nimokids.service;
 
+import com.nimokids.service.language.ResolvedQuestion;
+import com.nimokids.service.language.QuestionInstance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,7 +35,6 @@ import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
 import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.AnswerResult;
-import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.enums.SessionStatus;
 import com.nimokids.exception.AnswerTimeoutException;
 import com.nimokids.exception.BusinessException;
@@ -85,6 +86,7 @@ class GameSessionServiceTest {
     private final StickerService stickerService = mock(StickerService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final OptionGenerator optionGenerator = mock(OptionGenerator.class);
+    private final LanguageResolverService languageResolver = mock(LanguageResolverService.class);
     private final MutableClock clock = new MutableClock(START);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -101,7 +103,12 @@ class GameSessionServiceTest {
         service = new GameSessionServiceImpl(
                 sessionRepository, questionRepository, topicRepository, gameModeRepository, playerRepository,
                 playerStickerRepository, playerService, stickerService, activityLogService, optionGenerator,
-                new GameMapper(), clock);
+                languageResolver, new GameMapper(), clock);
+        when(languageResolver.resolve(any(), any())).thenAnswer(invocation -> {
+            QuestionInstance instance = invocation.getArgument(1);
+            return new ResolvedQuestion(instance.question().getQuestionText(), null, instance.options(),
+                    invocation.getArgument(0), "en", "en");
+        });
 
         anonymousId = UUID.randomUUID();
         player = player(anonymousId);
@@ -531,7 +538,7 @@ class GameSessionServiceTest {
     @Test
     void aQuestionThatCannotProduceOptionsIsSkippedAndReplaced() {
         List<GameQuestion> pool = stubCreate(7);
-        when(optionGenerator.generate(pool.get(0), LanguageMode.EN)).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
         // The first candidate may be any of the 7 after shuffling, so make one specific question always fail.
         GameSession created = createAndCapture();
 
@@ -542,8 +549,8 @@ class GameSessionServiceTest {
     @Test
     void createSessionFailsWhenFewerThanFiveQuestionsCanProduceOptions() {
         List<GameQuestion> pool = stubCreate(6);
-        when(optionGenerator.generate(pool.get(0), LanguageMode.EN)).thenThrow(new InsufficientDistractorsException("pool shrank"));
-        when(optionGenerator.generate(pool.get(1), LanguageMode.EN)).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(1))).thenThrow(new InsufficientDistractorsException("pool shrank"));
 
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
@@ -591,7 +598,7 @@ class GameSessionServiceTest {
             GameQuestion question = newQuestion();
             pool.add(question);
             when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
-            when(optionGenerator.generate(question, LanguageMode.EN)).thenAnswer(invocation -> newSnapshot());
+            when(optionGenerator.generate(question)).thenAnswer(invocation -> newSnapshot());
         }
         when(playerService.resolveOrCreate(anonymousId)).thenReturn(player);
         when(topicRepository.findById(topic.getId())).thenReturn(Optional.of(topic));

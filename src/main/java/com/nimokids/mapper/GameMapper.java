@@ -64,9 +64,9 @@ public class GameMapper {
                     && question.getCorrectAnswerItem().getMetadata() != null
                     ? question.getCorrectAnswerItem().getMetadata().get("emoji") : null;
             frozen = new QuestionSnapshot(question.getQuestionKey(), null, null, 1, null, null,
-                    question.textFor(sessionQuestion.getSession().getLanguageMode()),
+                    question.getQuestionText(),
                     url(question.getQuestionVoice()), url(question.getObjectSound()),
-                    emoji instanceof String s ? s : null, null, null, null);
+                    emoji instanceof String s ? s : null, null, null, null, null, null, null);
         }
         // Everything shown to the child comes from the frozen snapshot (rules 9.7).
         return new QuestionResponse(

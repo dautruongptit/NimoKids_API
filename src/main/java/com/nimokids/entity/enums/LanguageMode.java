@@ -6,9 +6,9 @@ package com.nimokids.entity.enums;
  * <ul>
  *   <li>{@link #EN}    - full English (UI, questions, answers). Not offered in the UI yet, kept for later.</li>
  *   <li>{@link #VI}    - full Vietnamese: questions, answers, topic names and feedback are served in Vietnamese.</li>
- *   <li>{@link #VI_EN} - Vietnamese interface, but the questions and answers stay English (the recommended
- *                        "learn English" mode). The content is identical to {@link #EN}; only the website
- *                        interface differs, so the server serves English text.</li>
+ *   <li>{@link #VI_EN} - "learn English" (recommended): Vietnamese interface and Vietnamese question template,
+ *                        English answers. Resolved by LanguageResolverService (vi for the template, en for the
+ *                        answer items).</li>
  * </ul>
  */
 public enum LanguageMode {
@@ -17,7 +17,17 @@ public enum LanguageMode {
     VI,
     VI_EN;
 
-    /** True when the content (questions, answers, topics, feedback) must be served in Vietnamese. */
+    /** Language of the question template and the feedback: Vietnamese for VI and VI_EN, English for EN. */
+    public String instructionLanguage() {
+        return this == EN ? "en" : "vi";
+    }
+
+    /** Language of the answer items: Vietnamese for VI only; VI_EN keeps English answers (learn English). */
+    public String answerLanguage() {
+        return this == VI ? "vi" : "en";
+    }
+
+    /** True when topics (which are not part of the question/answer i18n) are served in Vietnamese. */
     public boolean servesVietnamese() {
         return this == VI;
     }

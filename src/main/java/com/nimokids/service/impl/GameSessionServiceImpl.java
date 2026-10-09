@@ -1,5 +1,9 @@
 package com.nimokids.service.impl;
 
+import com.nimokids.service.language.ResolvedQuestion;
+import com.nimokids.service.language.QuestionInstance;
+import com.nimokids.service.language.I18nContent;
+import com.nimokids.service.LanguageResolverService;
 import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.dto.request.CreateGameSessionRequest;
 import com.nimokids.dto.request.SubmitAnswerRequest;
@@ -79,6 +83,7 @@ public class GameSessionServiceImpl implements GameSessionService {
     private final StickerService stickerService;
     private final ActivityLogService activityLogService;
     private final OptionGenerator optionGenerator;
+    private final LanguageResolverService languageResolver;
     private final GameMapper mapper;
     private final Clock clock;
 
@@ -163,9 +168,11 @@ public class GameSessionServiceImpl implements GameSessionService {
             if (question == null) {
                 continue;
             }
-            List<SnapshotOption> options;
+            ResolvedQuestion resolved;
             try {
-                options = optionGenerator.generate(question, languageMode);
+                // 1) generate (language-free)  2) resolve the language  3) save: the resolver is the last step.
+                List<SnapshotOption> generated = optionGenerator.generate(question);
+                resolved = languageResolver.resolve(languageMode, new QuestionInstance(question, generated));
             } catch (BusinessException ex) {
                 log.warn("Skipping question {}: {}", candidateId, ex.getMessage());
                 continue;
@@ -174,8 +181,8 @@ public class GameSessionServiceImpl implements GameSessionService {
             session.addSessionQuestion(SessionQuestion.builder()
                     .question(question)
                     .questionNumber((short) accepted)
-                    .optionsSnapshot(options)
-                    .questionSnapshot(QuestionSnapshot.of(question, languageMode))
+                    .optionsSnapshot(resolved.options())
+                    .questionSnapshot(QuestionSnapshot.of(question, resolved))
                     .presentedAt(accepted == 1 ? now : null)
                     .build());
         }
@@ -543,7 +550,7 @@ public class GameSessionServiceImpl implements GameSessionService {
     }
 
     private static String feedbackMessage(AnswerResult result, LanguageMode language) {
-        boolean vi = language.servesVietnamese();
+        boolean vi = I18nContent.VI.equals(language.instructionLanguage());
         return switch (result) {
             case CORRECT -> vi ? GameConstants.FEEDBACK_CORRECT_VI : GameConstants.FEEDBACK_CORRECT;
             case WRONG -> vi ? GameConstants.FEEDBACK_WRONG_VI : GameConstants.FEEDBACK_WRONG;
