@@ -40,6 +40,17 @@ public class AdminUser extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "last_login_at")
+    private java.time.Instant lastLoginAt;
+
+    /** Consecutive failed password logins; reset on success. Drives the progressive lockout. */
+    @Builder.Default
+    @Column(name = "failed_login_count", nullable = false)
+    private short failedLoginCount = 0;
+
+    @Column(name = "locked_until")
+    private java.time.Instant lockedUntil;
+
     /** Keep the hash out of any accidental toString/log output. */
     @Override
     public String toString() {

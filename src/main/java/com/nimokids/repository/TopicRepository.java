@@ -29,4 +29,15 @@ public interface TopicRepository extends JpaRepository<Topic, UUID> {
             SELECT id FROM subtree
             """, nativeQuery = true)
     List<UUID> findActiveSubtreeIds(UUID rootId);
+
+    /** MIX mode: every active topic reachable from an active ROOT topic, in ONE query (not one per root). */
+    @Query(value = """
+            WITH RECURSIVE subtree(id) AS (
+                SELECT id FROM topics WHERE parent_id IS NULL AND is_active = TRUE
+                UNION
+                SELECT t.id FROM topics t JOIN subtree s ON t.parent_id = s.id WHERE t.is_active = TRUE
+            )
+            SELECT id FROM subtree
+            """, nativeQuery = true)
+    List<UUID> findAllActiveSubtreeIds();
 }

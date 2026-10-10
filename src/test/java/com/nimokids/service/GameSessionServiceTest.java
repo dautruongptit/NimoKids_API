@@ -252,6 +252,25 @@ class GameSessionServiceTest {
     }
 
     @Test
+    void listenAgainRestartsTheCountdownFromTheMomentOfTheCall() {
+        startTimer(1);
+        clock.advance(Duration.ofSeconds(7));
+        service.startTimer(anonymousId, session.getSessionId(), new TimerStartRequest(question(1).getId(), true));
+        clock.advance(Duration.ofSeconds(9));   // 16 s after the first start: late without the restart, in time with it
+
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);
+    }
+
+    @Test
+    void afterARestartTheNewDeadlineStillApplies() {
+        startTimer(1);
+        service.startTimer(anonymousId, session.getSessionId(), new TimerStartRequest(question(1).getId(), true));
+        clock.advance(Duration.ofSeconds(9).plusMillis(1));
+
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.TIMEOUT);
+    }
+
+    @Test
     void aClientCannotGainTimeByReportingTheStartLate() {
         // Question 1 has no audio: the start can be at most presented + 3 s tolerance, however late the report arrives.
         clock.advance(Duration.ofSeconds(60));

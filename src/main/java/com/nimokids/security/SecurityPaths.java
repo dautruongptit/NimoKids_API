@@ -16,7 +16,11 @@ public final class SecurityPaths {
     public static final String ADMIN_BASE = "/api/v1/admin";
     public static final String ADMIN_PATTERN = ADMIN_BASE + "/**";
 
-    public static final String LOGIN_PATH = "/api/v1/auth/login";
+    public static final String AUTH_BASE = "/api/v1/auth";
+    public static final String LOGIN_PATH = AUTH_BASE + "/login";
+    public static final String REFRESH_PATH = AUTH_BASE + "/refresh";
+    public static final String LOGOUT_PATH = AUTH_BASE + "/logout";
+    public static final String SESSION_PATH = AUTH_BASE + "/session";
 
     /**
      * Endpoints open to everyone. "/api/v1/game/**" is the path used in project-context.md and
@@ -33,6 +37,11 @@ public final class SecurityPaths {
     };
 
     private SecurityPaths() {
+    }
+
+    public static boolean isAuthPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.equals(AUTH_BASE) || path.startsWith(AUTH_BASE + "/");
     }
 
     public static boolean isAdminPath(HttpServletRequest request) {

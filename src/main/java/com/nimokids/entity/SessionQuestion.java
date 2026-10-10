@@ -74,6 +74,10 @@ public class SessionQuestion extends BaseEntity {
     @Column(name = "timer_started_at")
     private Instant timerStartedAt;
 
+    /** Set when the child pressed "Listen again": the countdown restarted at this moment (server clock). */
+    @Column(name = "timer_restarted_at")
+    private Instant timerRestartedAt;
+
     /** An optionId from {@link #optionsSnapshot}. A plain UUID: there is no options table to point at any more. */
     @Column(name = "selected_option_id")
     private UUID selectedOptionId;

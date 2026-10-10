@@ -64,6 +64,9 @@ public class OptionGeneratorImpl implements OptionGenerator {
         for (DistractorRule rule : rules) {
             List<AnswerItem> candidates = answerItemRepository.findRandomMatching(
                     toJson(rule), List.copyOf(excludedIds), rule.count() * CANDIDATES_PER_PICK);
+            if (!candidates.isEmpty()) {
+                answerItemRepository.findAllWithMedia(candidates.stream().map(AnswerItem::getId).toList());
+            }
             int picked = 0;
             for (AnswerItem candidate : candidates) {
                 if (picked == rule.count()) {

@@ -1,5 +1,6 @@
 package com.nimokids.controller.admin;
 
+import com.nimokids.service.auth.SessionGuard;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -26,6 +27,7 @@ class AdminTopicControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtService jwtService;
     @MockitoBean private ApiLogService apiLogService;
+    @MockitoBean private SessionGuard sessionGuard;
 
     @Test
     void superAdminCanCallTheEndpointAndTheControllerSeesWhoIsCalling() throws Exception {

@@ -1,5 +1,6 @@
 package com.nimokids.security;
 
+import com.nimokids.service.auth.SessionGuard;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,6 +39,7 @@ class AdminSecurityTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtService jwtService;
     @MockitoBean private TopicService topicService;
+    @MockitoBean private SessionGuard sessionGuard;
     @MockitoBean private ApiLogService apiLogService;
 
     @Test
@@ -92,11 +94,16 @@ class AdminSecurityTest {
                 .signWith(Keys.hmacShaKeyFor("a-completely-different-32-byte-key!!".getBytes(StandardCharsets.UTF_8)))
                 .compact();
 
-        for (String token : List.of("garbage", expired, tampered, wrongKey, unsigned, wrongIssuer, "")) {
+        // The client needs one distinction only: an EXPIRED token is worth a refresh, anything else is a sign-in.
+        // Why a token is invalid (bad signature, wrong issuer ...) is still never revealed.
+        for (String token : List.of("garbage", tampered, wrongKey, unsigned, wrongIssuer, "")) {
             mockMvc.perform(get("/api/v1/admin/ping").header("Authorization", "Bearer " + token))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+                    .andExpect(jsonPath("$.error.code").value("TOKEN_INVALID"));
         }
+        mockMvc.perform(get("/api/v1/admin/ping").header("Authorization", "Bearer " + expired))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("TOKEN_EXPIRED"));
         mockMvc.perform(get("/api/v1/admin/ping").header("Authorization", "Basic YWRtaW46YWRtaW4="))
                 .andExpect(status().isUnauthorized());
     }

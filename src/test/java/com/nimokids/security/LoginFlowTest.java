@@ -1,5 +1,20 @@
 package com.nimokids.security;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.mockito.ArgumentMatchers.any;
+import java.time.Instant;
+import com.nimokids.service.auth.TokenHasher;
+import com.nimokids.service.auth.SecurityEventService;
+import com.nimokids.service.auth.RateLimiter;
+import com.nimokids.service.auth.LoginHistoryService;
+import com.nimokids.service.auth.ClientContextResolver;
+import com.nimokids.service.auth.ClientContext;
+import com.nimokids.service.auth.AuthSessionService;
+import com.nimokids.service.auth.AuthPolicyService;
+import com.nimokids.service.auth.AuthPolicy;
+import com.nimokids.service.auth.AuthCookies;
+import com.nimokids.entity.AuthSession;
+import com.nimokids.config.TimeConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -37,7 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** Real login service + real JWT + real security rules; only the users table is mocked. */
 @WebMvcTest(controllers = {AuthController.class, LoginFlowTest.AdminProbeController.class})
 @Import({SecurityConfig.class, SecurityErrorHandler.class, StaticRoleAuthorityResolver.class, JwtService.class,
-        AuthServiceImpl.class, LoginFlowTest.AdminProbeController.class})
+        AuthServiceImpl.class, AuthCookies.class, RateLimiter.class, TimeConfig.class, LoginFlowTest.AdminProbeController.class})
 class LoginFlowTest {
 
     private static final String ADMIN_EMAIL = "admin@nimokids.local";
@@ -48,6 +63,11 @@ class LoginFlowTest {
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private AdminUserRepository userRepository;
     @MockitoBean private ApiLogService apiLogService;
+    @MockitoBean private AuthSessionService sessionService;
+    @MockitoBean private ClientContextResolver contextResolver;
+    @MockitoBean private LoginHistoryService loginHistory;
+    @MockitoBean private SecurityEventService securityEvents;
+    @MockitoBean private AuthPolicyService policyService;
 
     private AdminUser admin;
 
@@ -56,13 +76,33 @@ class LoginFlowTest {
         admin = user(ADMIN_EMAIL, "admin123", true);
         when(userRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase(ADMIN_EMAIL)).thenReturn(Optional.of(admin));
+
+        // The session system is tested on its own; here it hands out a token signed by the real JwtService.
+        when(contextResolver.resolve(any(), any())).thenReturn(ClientContext.unknown());
+        when(policyService.current()).thenReturn(AuthPolicy.defaults());
+        when(loginHistory.record(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new LoginHistoryService.Recorded(UUID.randomUUID(), false, false));
+        when(sessionService.createSession(any(), any(), any())).thenAnswer(invocation -> {
+            AuthSessionService.Principal principal = invocation.getArgument(0);
+            Instant now = Instant.now();
+            AuthSession session = AuthSession.builder().id(UUID.randomUUID()).build();
+            Instant accessExpires = now.plusSeconds(900);
+            String access = jwtService.generateAccessToken(principal.id().toString(), principal.role(),
+                    principal.type().name(), session.getId(), now, accessExpires);
+            return new AuthSessionService.IssuedTokens(access, accessExpires, TokenHasher.newRawToken(),
+                    now.plusSeconds(3600), session, principal);
+        });
     }
 
     @Test
     void adminLoginReturnsAJwtWithTheRoleClaimThatOpensAdminEndpoints() throws Exception {
         String token = login(ADMIN_EMAIL, "admin123");
 
-        assertThat(jwtService.parse(token)).contains(new JwtPrincipal(admin.getId().toString(), "SUPER_ADMIN"));
+        JwtPrincipal principal = jwtService.parse(token).orElseThrow();
+        assertThat(principal.subject()).isEqualTo(admin.getId().toString());
+        assertThat(principal.role()).isEqualTo("SUPER_ADMIN");
+        assertThat(principal.type()).isEqualTo("ADMIN");
+        assertThat(principal.sessionId()).isNotNull();
         mockMvc.perform(get("/api/v1/admin/ping").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
     }
@@ -74,11 +114,15 @@ class LoginFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.data.expiresInSeconds").value(3600))
+                .andExpect(jsonPath("$.data.expiresInSeconds").value(Matchers.lessThanOrEqualTo(900)))
                 .andExpect(jsonPath("$.data.email").value(ADMIN_EMAIL))
                 .andExpect(jsonPath("$.data.role").value("SUPER_ADMIN"))
                 .andExpect(content().string(Matchers.not(Matchers.containsString("$2a$"))))
-                .andExpect(content().string(Matchers.not(Matchers.containsString("password"))));
+                .andExpect(content().string(Matchers.not(Matchers.containsString("password"))))
+                // the refresh token travels in an HttpOnly cookie, never in the body
+                .andExpect(content().string(Matchers.not(Matchers.containsString("refresh"))))
+                .andExpect(header().string("Set-Cookie", Matchers.allOf(Matchers.containsString("HttpOnly"),
+                        Matchers.containsString("SameSite=Strict"), Matchers.containsString("Path=/api/v1/auth"))));
     }
 
     @Test

@@ -29,6 +29,19 @@ public enum ErrorCode {
     // Not in the master list: needed for the Admin JWT protection (401 / 403) of /api/v1/admin/**.
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Authentication is required"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "Access denied"),
+    // Authentication, sessions and tokens (docs 06-authentication, section 6 of 02-FLOWS).
+    TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "The access token has expired"),
+    TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "The access token is not valid"),
+    SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "The session has expired"),
+    SESSION_REVOKED(HttpStatus.UNAUTHORIZED, "The session has ended"),
+    REFRESH_INVALID(HttpStatus.UNAUTHORIZED, "The refresh token is not valid"),
+    REFRESH_REUSED(HttpStatus.UNAUTHORIZED, "The refresh token was already used; the session has been ended"),
+    ACCOUNT_DISABLED(HttpStatus.FORBIDDEN, "The account is not available"),
+    CSRF_REJECTED(HttpStatus.FORBIDDEN, "The request origin is not allowed"),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many attempts, try again later"),
+    AUTH_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "Session not found"),
+    RETURN_TO_INVALID(HttpStatus.BAD_REQUEST, "The return address is not allowed"),
+    OAUTH_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Sign-in with Google is not available"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error");
 
     private final HttpStatus httpStatus;

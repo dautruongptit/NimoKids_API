@@ -26,8 +26,13 @@ public class SecurityErrorHandler implements AuthenticationEntryPoint, AccessDen
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
             throws IOException {
-        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-        write(response, ErrorCode.UNAUTHORIZED);
+        // The filter says why the token was refused (expired, revoked ...); no token at all is a plain 401.
+        Object reason = request.getAttribute(AuthFailure.ATTRIBUTE);
+        ErrorCode code = reason instanceof ErrorCode known ? known : ErrorCode.UNAUTHORIZED;
+        if (code.getHttpStatus().value() == 401) {
+            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        }
+        write(response, code);
     }
 
     @Override

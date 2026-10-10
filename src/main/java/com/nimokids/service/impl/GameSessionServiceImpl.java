@@ -59,7 +59,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -115,11 +117,7 @@ public class GameSessionServiceImpl implements GameSessionService {
             }
         } else {
             topic = null;
-            subtree = topicRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
-                    .filter(t -> t.getParentTopic() == null)
-                    .flatMap(t -> topicRepository.findActiveSubtreeIds(t.getId()).stream())
-                    .distinct()
-                    .toList();
+            subtree = topicRepository.findAllActiveSubtreeIds();
             if (subtree.isEmpty()) {
                 throw new TopicNotPlayableException();
             }
@@ -159,12 +157,17 @@ public class GameSessionServiceImpl implements GameSessionService {
                 .startedAt(now)
                 .build();
 
+        // The first candidates are loaded in ONE query with everything the snapshot needs (a few spare ones in case some are skipped).
+        Map<UUID, GameQuestion> preloaded = new HashMap<>();
+        questionRepository.findAllWithDetails(candidateIds.subList(0, Math.min(candidateIds.size(), GameConstants.QUESTIONS_PER_SESSION + 3)))
+                .forEach(loaded -> preloaded.put(loaded.getId(), loaded));
+
         int accepted = 0;
         for (UUID candidateId : candidateIds) {
             if (accepted == GameConstants.QUESTIONS_PER_SESSION) {
                 break;
             }
-            GameQuestion question = questionRepository.findById(candidateId).orElse(null);
+            GameQuestion question = preloaded.containsKey(candidateId) ? preloaded.get(candidateId) : questionRepository.findById(candidateId).orElse(null);
             if (question == null) {
                 continue;
             }
@@ -215,7 +218,9 @@ public class GameSessionServiceImpl implements GameSessionService {
         GameSession session = loadOwnedSession(anonymousId, sessionId, true);
         requireStarted(session);
         SessionQuestion current = requireCurrentUnanswered(session, request.questionId());
-        if (current.getTimerStartedAt() == null) {
+        if (Boolean.TRUE.equals(request.restart())) {
+            current.setTimerRestartedAt(clock.instant());
+        } else if (current.getTimerStartedAt() == null) {
             current.setTimerStartedAt(clock.instant());
         }
     }
@@ -393,6 +398,9 @@ public class GameSessionServiceImpl implements GameSessionService {
      * Without a report, that latest allowed moment is used. So a client cannot gain time by reporting late or never.
      */
     static Instant effectiveTimerStart(GameSession session, SessionQuestion sessionQuestion) {
+        if (sessionQuestion.getTimerRestartedAt() != null) {
+            return sessionQuestion.getTimerRestartedAt(); // "Listen again": the server's own clock at that call
+        }
         Instant presentedAt = presentedAt(session, sessionQuestion);
         long audioMs = 0;
         var voice = sessionQuestion.getQuestion().getQuestionVoice();

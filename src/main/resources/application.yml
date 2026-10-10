@@ -19,6 +19,9 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
     show-sql: false
 
   flyway:
@@ -37,6 +40,11 @@ server:
 app:
   jwt:
     expiration-minutes: 60
+  google:
+    # Sign in with Google. Empty = switched off. Values come from the environment (never from the repository).
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:}
 
 logging:
   pattern:

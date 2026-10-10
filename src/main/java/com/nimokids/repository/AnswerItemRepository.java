@@ -32,4 +32,8 @@ public interface AnswerItemRepository extends JpaRepository<AnswerItem, UUID> {
             LIMIT :limit
             """, nativeQuery = true)
     List<AnswerItem> findRandomMatching(String match, Collection<UUID> excludedIds, int limit);
+
+    /** Loads the image and voice of the given items in ONE query so reading them later costs no extra round trips. */
+    @Query("SELECT DISTINCT a FROM AnswerItem a LEFT JOIN FETCH a.image LEFT JOIN FETCH a.voice WHERE a.id IN :ids")
+    List<AnswerItem> findAllWithMedia(Collection<UUID> ids);
 }

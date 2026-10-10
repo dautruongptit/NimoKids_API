@@ -34,6 +34,12 @@ services:
       # Empty on purpose: the browser talks to the web container (same origin), not to the API directly.
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       # First SUPER_ADMIN, created once when none exists. Set both for the first start, then remove them.
+      # Sign in with Google (optional). The redirect URI must be registered in Google Cloud exactly as written here.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      AUTH_WEB_URL: ${AUTH_WEB_URL:-}
+      AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS:-}
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
       API_LOG_CLIENT_IP_HEADER: ${API_LOG_CLIENT_IP_HEADER:-CF-Connecting-IP}

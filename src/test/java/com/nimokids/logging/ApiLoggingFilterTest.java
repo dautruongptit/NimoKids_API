@@ -1,5 +1,6 @@
 package com.nimokids.logging;
 
+import com.nimokids.service.auth.SessionGuard;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -39,6 +40,7 @@ class ApiLoggingFilterTest {
 
     @Autowired private MockMvc mockMvc;
     @MockitoBean private ApiLogService apiLogService;
+    @MockitoBean private SessionGuard sessionGuard;
     @MockitoBean private TopicService topicService;
     @MockitoBean private GameSessionService gameSessionService;
 

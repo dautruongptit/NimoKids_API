@@ -1,5 +1,6 @@
 package com.nimokids.repository;
 
+import com.nimokids.util.GameConstants;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,7 +74,8 @@ class EngineIntegrationTest {
             "ALPHABET", "FOOD", "TOYS", "CLOTHES", "HOME", "NATURE", "SEA_ANIMALS", "FARM_ANIMALS");
 
     private List<GameQuestion> seededQuestions() {
-        return em.createQuery("select q from GameQuestion q where q.active = true and q.topic.code in :codes",
+        return em.createQuery("select q from GameQuestion q where q.active = true and q.topic.code in :codes "
+                + "and q.template.kind = 'CURATED'",
                 GameQuestion.class).setParameter("codes", ROOTS).getResultList();
     }
 
@@ -103,8 +105,36 @@ class EngineIntegrationTest {
         List<UUID> subtree = topicRepository.findActiveSubtreeIds(parent.getId());
         assertThat(subtree).containsExactlyInAnyOrder(parent.getId(), sea.getId(), farm.getId());
         GameMode mode = gameModeRepository.findByCode("GUESS").orElseThrow();
-        // 10 questions of each child and none on the parent itself.
-        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), 3)).hasSize(20);
+        String[] young = {"AGE_1_3"};
+        // Every active AGE_1_3 question of the two children: 10 hand-written + the short template questions.
+        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), young, GameConstants.ANIMAL_SOUND_MODE_CODE))
+                .hasSize(10 + 12 + 10 + 9);
+        // What a session uses: both children have enough short template questions, so the long ones are left out.
+        assertThat(questionRepository.findCandidateIds(subtree, mode.getId(), young)).hasSize(12 + 9);
+    }
+
+    @Test
+    void shortTemplateQuestionsAreGeneratedAndNeverOfferALookAlikeAsAWrongAnswer() {
+        List<GameQuestion> generated = em.createQuery(
+                "select q from GameQuestion q where q.active = true and q.template.kind = 'TEMPLATE'", GameQuestion.class)
+                .getResultList();
+        assertThat(generated.size()).as("generated template questions").isGreaterThanOrEqualTo(150);
+
+        for (GameQuestion question : generated) {
+            String label = question.getQuestionKey();
+            assertThat(question.getQuestionText().length()).as(label + " is short").isLessThanOrEqualTo(25);
+            Object lookalike = question.getCorrectAnswerItem().getMetadata().get("lookalike");
+            for (int run = 0; run < 5; run++) {
+                List<SnapshotOption> options = optionGenerator.generate(question);
+                assertThat(options).as(label).hasSize(4);
+                assertThat(options.stream().filter(SnapshotOption::isCorrect)).as(label).hasSize(1);
+                if (lookalike != null) {
+                    long sameLook = options.stream().map(option -> answerItemRepository.findById(option.answerItemId())
+                            .orElseThrow().getMetadata().get("lookalike")).filter(lookalike::equals).count();
+                    assertThat(sameLook).as(label + " offers a look-alike").isEqualTo(1);
+                }
+            }
+        }
     }
 
     @Test

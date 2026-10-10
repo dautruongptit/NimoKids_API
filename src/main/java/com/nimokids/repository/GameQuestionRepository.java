@@ -26,17 +26,33 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
             FROM game_questions q
             JOIN game_modes m ON m.id = q.game_mode_id
             JOIN answer_items a ON a.id = q.correct_answer_item_id
+            LEFT JOIN question_templates qt ON qt.id = q.template_id
             WHERE q.topic_id IN (:topicIds)
               AND q.game_mode_id = :gameModeId
               AND q.is_active = TRUE AND m.is_active = TRUE AND a.is_active = TRUE
               AND q.age_group = ANY(CAST(:ageGroups AS age_group[]))
               AND (m.code <> :soundModeCode OR q.object_sound_id IS NOT NULL)
               AND jsonb_typeof(q.metadata -> 'distractor_rules') = 'array'
+              -- Short template questions are preferred: once a topic (and age group) has at least :templateOnlyFrom of
+              -- them, the long hand-written (CURATED) questions are not offered any more. 0 turns the rule off.
+              AND (:templateOnlyFrom <= 0 OR qt.kind = 'TEMPLATE' OR (
+                    SELECT count(*) FROM game_questions g
+                    JOIN question_templates gt ON gt.id = g.template_id AND gt.kind = 'TEMPLATE'
+                    WHERE g.topic_id = q.topic_id AND g.game_mode_id = q.game_mode_id
+                      AND g.age_group = q.age_group AND g.is_active = TRUE) < :templateOnlyFrom)
             """, nativeQuery = true)
-    List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode);
+    List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode,
+                                int templateOnlyFrom);
 
+    /** Without the template preference (every active question is a candidate). */
+    default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode) {
+        return findCandidateIds(topicIds, gameModeId, ageGroups, soundModeCode, 0);
+    }
+
+    /** What a game session uses: short template questions are preferred (see {@link GameConstants#TEMPLATE_ONLY_FROM}). */
     default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups) {
-        return findCandidateIds(topicIds, gameModeId, ageGroups, GameConstants.ANIMAL_SOUND_MODE_CODE);
+        return findCandidateIds(topicIds, gameModeId, ageGroups, GameConstants.ANIMAL_SOUND_MODE_CODE,
+                GameConstants.TEMPLATE_ONLY_FROM);
     }
 
     /**
@@ -77,4 +93,18 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
     default List<UUID> findPlayableTopicIds(long minCount) {
         return findPlayableTopicIds(minCount, GameConstants.ANIMAL_SOUND_MODE_CODE);
     }
+
+    /** Loads questions with everything a session snapshot reads, in ONE query (instead of ~6 lazy loads per question). */
+    @Query("""
+            SELECT DISTINCT q FROM GameQuestion q
+            LEFT JOIN FETCH q.topic
+            LEFT JOIN FETCH q.template
+            LEFT JOIN FETCH q.questionVoice
+            LEFT JOIN FETCH q.objectSound
+            LEFT JOIN FETCH q.correctAnswerItem ci
+            LEFT JOIN FETCH ci.image
+            LEFT JOIN FETCH ci.voice
+            WHERE q.id IN :ids
+            """)
+    List<GameQuestion> findAllWithDetails(Collection<UUID> ids);
 }

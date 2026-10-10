@@ -1,5 +1,6 @@
 package com.nimokids.controller;
 
+import com.nimokids.service.auth.SessionGuard;
 import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.LanguageMode;
 import static org.mockito.ArgumentMatchers.any;
@@ -68,6 +69,7 @@ class ApiControllersTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private TopicService topicService;
+    @MockitoBean private SessionGuard sessionGuard;
     @MockitoBean private GameModeService gameModeService;
     @MockitoBean private GameSessionService gameSessionService;
     @MockitoBean private StickerService stickerService;
@@ -377,11 +379,11 @@ class ApiControllersTest {
     @Test
     void corsPreflightIsAllowedForTheConfiguredFrontendOnly() throws Exception {
         mockMvc.perform(options("/api/v1/game-sessions")
-                        .header("Origin", "http://localhost:5173")
+                        .header("Origin", "http://localhost:5100")
                         .header("Access-Control-Request-Method", "POST")
                         .header("Access-Control-Request-Headers", "content-type,x-anonymous-id"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5100"));
 
         mockMvc.perform(options("/api/v1/game-sessions")
                         .header("Origin", "https://evil.example")

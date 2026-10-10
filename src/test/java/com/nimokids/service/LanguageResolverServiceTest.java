@@ -44,7 +44,8 @@ class LanguageResolverServiceTest {
         question.setId(UUID.randomUUID());
 
         instance = new QuestionInstance(question, List.of(option(cat, 1, true), option(dog, 2, false)));
-        when(items.findAllById(anyIterable())).thenReturn(List.of(cat, dog));
+        when(items.findById(cat.getId())).thenReturn(java.util.Optional.of(cat));
+        when(items.findById(dog.getId())).thenReturn(java.util.Optional.of(dog));
     }
 
     @Test
@@ -95,7 +96,8 @@ class LanguageResolverServiceTest {
     void aMissingTranslationFallsBackToEnglishThenToTheStoredName() {
         AnswerItem bird = item("Bird", Map.of("en", Map.of("text", "Bird")));          // no vi
         AnswerItem fish = item("Fish", Map.of());                                       // nothing at all
-        when(items.findAllById(anyIterable())).thenReturn(List.of(bird, fish));
+        when(items.findById(bird.getId())).thenReturn(java.util.Optional.of(bird));
+        when(items.findById(fish.getId())).thenReturn(java.util.Optional.of(fish));
         question.getTemplate().setI18n(Map.of("en", Map.of("text", "What is this?")));  // template without vi
 
         ResolvedQuestion resolved = resolver.resolve(LanguageMode.VI,

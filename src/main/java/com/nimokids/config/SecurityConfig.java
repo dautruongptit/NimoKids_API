@@ -1,5 +1,10 @@
 package com.nimokids.config;
 
+import com.nimokids.service.auth.google.GoogleOidcProperties;
+import com.nimokids.service.auth.SessionGuard;
+import com.nimokids.service.auth.AuthProperties;
+import com.nimokids.security.OriginCsrfFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimokids.security.AuthorityResolver;
 import com.nimokids.security.JwtAuthenticationFilter;
 import com.nimokids.security.JwtProperties;
@@ -44,12 +49,13 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity // turns on @PreAuthorize / @PostAuthorize
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, AuthProperties.class, GoogleOidcProperties.class})
 public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, JwtService jwtService, AuthorityResolver authorityResolver, SecurityErrorHandler errorHandler)
+            HttpSecurity http, JwtService jwtService, AuthorityResolver authorityResolver, SecurityErrorHandler errorHandler,
+            SessionGuard sessionGuard, AuthProperties authProperties, ObjectMapper objectMapper)
             throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable) // stateless API: no cookies or sessions to protect
@@ -65,10 +71,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()          // CORS preflight
                         .requestMatchers(SecurityPaths.ADMIN_PATTERN).authenticated()
                         .requestMatchers(HttpMethod.POST, SecurityPaths.LOGIN_PATH).permitAll()
+                        // Cookie-authenticated (CSRF-checked) or self-checking endpoints of the session system:
+                        .requestMatchers(HttpMethod.POST, SecurityPaths.REFRESH_PATH, SecurityPaths.LOGOUT_PATH).permitAll()
+                        .requestMatchers(HttpMethod.GET, SecurityPaths.SESSION_PATH).permitAll()
+                        .requestMatchers(HttpMethod.GET, SecurityPaths.AUTH_BASE + "/google/start", SecurityPaths.AUTH_BASE + "/google/callback").permitAll()
+                        .requestMatchers(SecurityPaths.AUTH_BASE + "/**").authenticated()   // me, logout-all, sessions
                         .requestMatchers(SecurityPaths.PUBLIC_PATTERNS).permitAll()
                         .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().denyAll())
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService, authorityResolver), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new OriginCsrfFilter(authProperties.allowedOrigins(), objectMapper), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthenticationFilter(jwtService, authorityResolver, sessionGuard), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
@@ -79,7 +91,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(allowedOrigins.stream().filter(origin -> !origin.isBlank()).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
-                "Content-Type", "Authorization", "X-Anonymous-Id", "X-Request-Id"));
+                "Content-Type", "Authorization", "X-Anonymous-Id", "X-Request-Id", "X-NK-Requested-With"));
         configuration.setExposedHeaders(List.of("X-Request-Id"));
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);

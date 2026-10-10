@@ -13,6 +13,13 @@ public final class GameConstants {
      * fills the slot, so a topic with few AGE_4_5 questions is still playable.
      */
     public static final String AGE_4_5_MIX_PATTERN = "HEHEH";
+
+    /**
+     * Children aged 1-5 may not understand a long question, so the short template questions ("What is this?") are the
+     * standard. A topic that has at least this many of them (per age group) no longer offers its long hand-written
+     * questions; they stay in the database and come back for topics with fewer template questions. 0 = off.
+     */
+    public static final int TEMPLATE_ONLY_FROM = 8;
     public static final int MIN_PLAYABLE_QUESTIONS_PER_TOPIC = 5;
     public static final int DEFAULT_TIME_LIMIT_SECONDS = 8;
     public static final int OPTIONS_PER_QUESTION = 4;

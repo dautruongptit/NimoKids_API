@@ -23,7 +23,7 @@ SELECT DISTINCT ON (q.question_key)
                    THEN jsonb_build_object('vi', jsonb_build_object('text', q.metadata ->> 'text_vi'))
                    ELSE '{}'::jsonb END
 FROM game_questions q
-WHERE q.question_key IS NOT NULL
+WHERE q.question_key IS NOT NULL AND q.question_key NOT LIKE 'TPL\_%'   -- generated rows already have their template
 ORDER BY q.question_key, q.created_at
 ON CONFLICT (code) DO UPDATE
     SET i18n = EXCLUDED.i18n, question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group,
