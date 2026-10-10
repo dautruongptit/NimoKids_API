@@ -221,7 +221,7 @@ public class GameSessionServiceImpl implements GameSessionService {
         if (Boolean.TRUE.equals(request.restart())) {
             // At most MAX_LISTEN_AGAIN restarts per question; further calls are ignored (best-effort from the client).
             if (current.getTimerRestarts() < GameConstants.MAX_LISTEN_AGAIN) {
-                current.setTimerRestarts(current.getTimerRestarts() + 1);
+                current.setTimerRestarts((short) (current.getTimerRestarts() + 1));
                 current.setTimerRestartedAt(clock.instant());
             }
         } else if (current.getTimerStartedAt() == null) {

@@ -80,7 +80,7 @@ public class SessionQuestion extends BaseEntity {
 
     /** How many times "Listen again" restarted the countdown for this question (capped by GameConstants.MAX_LISTEN_AGAIN). */
     @Column(name = "timer_restarts", nullable = false)
-    private int timerRestarts;
+    private short timerRestarts;
 
     /** An optionId from {@link #optionsSnapshot}. A plain UUID: there is no options table to point at any more. */
     @Column(name = "selected_option_id")
