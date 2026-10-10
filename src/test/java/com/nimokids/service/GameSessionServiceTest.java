@@ -106,7 +106,7 @@ class GameSessionServiceTest {
                 languageResolver, new GameMapper(), clock);
         when(languageResolver.resolve(any(), any())).thenAnswer(invocation -> {
             QuestionInstance instance = invocation.getArgument(1);
-            return new ResolvedQuestion(instance.question().getQuestionText(), null, instance.options(),
+            return new ResolvedQuestion(instance.question().getQuestionText(), null, null, instance.options(),
                     invocation.getArgument(0), "en", "en");
         });
 
@@ -299,11 +299,23 @@ class GameSessionServiceTest {
     @Test
     void withoutAnyReportTheLatestAllowedStartIsUsed() {
         clock.advance(Duration.ofSeconds(12));
-        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);          // START+12 = deadline of START+3+8+1
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);          // well inside the deadline START+4+3+8+1
 
         startTimer(2);                                                              // keeps the test readable
         clock.advance(Duration.ofSeconds(9).plusMillis(1));
         assertThat(answer(2, 0).result()).isEqualTo(AnswerResult.TIMEOUT);
+    }
+
+    @Test
+    void theFirstQuestionGetsTheTopicVoiceAllowanceBeforeItsCountdown() {
+        clock.advance(Duration.ofSeconds(4 + 3 + 8).plusMillis(1));          // allowance 4 s + tolerance 3 s + limit 8 s, grace not used
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.CORRECT);
+    }
+
+    @Test
+    void firstQuestionIsLateOnceAllowanceToleranceLimitAndGraceAreSpent() {
+        clock.advance(Duration.ofSeconds(4 + 3 + 8 + 1).plusMillis(1));
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.TIMEOUT);
     }
 
     @Test

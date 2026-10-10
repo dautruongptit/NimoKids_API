@@ -195,7 +195,7 @@ class ApiControllersTest {
         when(gameSessionService.submitAnswer(eq(anonymousId), eq(sessionId), any())).thenReturn(
                 new AnswerResponse(AnswerResult.CORRECT, true, 1, 1,
                         new CorrectAnswerResponse(optionId, "Cat", null), new FeedbackResponse(null, "Great job!"), true,
-                        new NextQuestionResponse(2, 5, new QuestionResponse(questionId, "Which animal can fly?", null, null, null,
+                        new NextQuestionResponse(2, 5, new QuestionResponse(questionId, "Which animal can fly?", null, null, null, null,
                                 List.of(new OptionResponse(optionId, "Bird", null, null))))));
 
         mockMvc.perform(post("/api/v1/game-sessions/" + sessionId + "/submit-answer")

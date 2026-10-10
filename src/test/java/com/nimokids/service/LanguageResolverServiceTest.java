@@ -68,17 +68,19 @@ class LanguageResolverServiceTest {
         assertThat(resolved.questionAudioUrl()).isEqualTo("/audio/en/what_is_this.mp3");
         assertThat(resolved.options()).extracting(SnapshotOption::text).containsExactly("Cat", "Dog");
         assertThat(resolved.options().get(0).voiceUrl()).isEqualTo("/audio/en/cat.mp3");
+        assertThat(resolved.questionTextVi()).isNull();   // the subtitle is for VI_EN only
     }
 
     @Test
-    void viEnAsksInVietnameseAndAnswersInEnglish() {
+    void viEnAsksAndAnswersInEnglishWithAVietnameseSubtitle() {
         ResolvedQuestion resolved = resolver.resolve(LanguageMode.VI_EN, instance);
 
-        assertThat(resolved.questionText()).isEqualTo("Đây là gì?");
-        assertThat(resolved.questionAudioUrl()).isEqualTo("/audio/vi/what_is_this.mp3");
+        assertThat(resolved.questionText()).isEqualTo("What is this?");
+        assertThat(resolved.questionTextVi()).isEqualTo("Đây là gì?");
+        assertThat(resolved.questionAudioUrl()).isEqualTo("/audio/en/what_is_this.mp3");
         assertThat(resolved.options()).extracting(SnapshotOption::text).containsExactly("Cat", "Dog");
         assertThat(resolved.options().get(0).voiceUrl()).isEqualTo("/audio/en/cat.mp3");
-        assertThat(resolved.instructionLanguage()).isEqualTo("vi");
+        assertThat(resolved.instructionLanguage()).isEqualTo("en");
         assertThat(resolved.answerLanguage()).isEqualTo("en");
     }
 

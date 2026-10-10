@@ -14,6 +14,7 @@ import java.util.UUID;
  *
  * @param questionKey      stable key of the question (template / key of the bank)
  * @param questionText     the text in the session language (see {@code languageMode})
+ * @param questionTextVi   Vietnamese subtitle of the question (VI_EN only), else null
  * @param questionImage    picture of the answer item (an emoji today, an URL later)
  * @param generation       the rules that produced the options (distractor_rules, correct_match), for audit
  */
@@ -25,6 +26,7 @@ public record QuestionSnapshot(
         UUID topicId,
         String topicCode,
         String questionText,
+        String questionTextVi,
         String questionVoiceUrl,
         String objectSoundUrl,
         String questionImage,
@@ -55,6 +57,7 @@ public record QuestionSnapshot(
                 question.getTopic() != null ? question.getTopic().getId() : null,
                 question.getTopic() != null ? question.getTopic().getCode() : null,
                 resolved.questionText(),
+                resolved.questionTextVi(),
                 resolved.questionAudioUrl(),
                 question.getObjectSound() != null ? question.getObjectSound().getStorageUrl() : null,
                 emoji instanceof String s ? s : null,

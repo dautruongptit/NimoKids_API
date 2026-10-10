@@ -12,6 +12,8 @@ import java.util.UUID;
 public record QuestionResponse(
         UUID id,
         String questionText,
+        /** Vietnamese text of the question, a subtitle shown under it in the "learn English" mode (VI_EN); null otherwise. */
+        String questionTextVi,
         String questionVoice,
         String objectSound,
         /** Emoji or image URL representing the subject of the question (e.g. "🐱" for a question about cats). */

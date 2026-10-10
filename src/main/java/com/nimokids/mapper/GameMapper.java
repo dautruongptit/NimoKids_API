@@ -64,7 +64,7 @@ public class GameMapper {
                     && question.getCorrectAnswerItem().getMetadata() != null
                     ? question.getCorrectAnswerItem().getMetadata().get("emoji") : null;
             frozen = new QuestionSnapshot(question.getQuestionKey(), null, null, 1, null, null,
-                    question.getQuestionText(),
+                    question.getQuestionText(), null,
                     url(question.getQuestionVoice()), url(question.getObjectSound()),
                     emoji instanceof String s ? s : null, null, null, null, null, null, null);
         }
@@ -72,6 +72,7 @@ public class GameMapper {
         return new QuestionResponse(
                 question.getId(),
                 frozen.questionText(),
+                frozen.questionTextVi(),
                 frozen.questionVoiceUrl(),
                 frozen.objectSoundUrl(),
                 frozen.questionImage(),

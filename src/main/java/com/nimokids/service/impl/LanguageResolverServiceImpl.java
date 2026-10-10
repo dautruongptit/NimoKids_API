@@ -42,6 +42,7 @@ public class LanguageResolverServiceImpl implements LanguageResolverService {
         QuestionTemplate template = question.getTemplate();
         String text = resolveQuestionText(question, template, instructionLanguage);
         String audio = resolveQuestionAudio(question, template, instructionLanguage);
+        String subtitle = languageMode == LanguageMode.VI_EN ? resolveQuestionText(question, template, I18nContent.VI) : null;
 
         Map<UUID, AnswerItem> items = loadItems(instance.options());
         List<SnapshotOption> options = new ArrayList<>(instance.options().size());
@@ -60,7 +61,7 @@ public class LanguageResolverServiceImpl implements LanguageResolverService {
                     option.displayOrder(),
                     option.isCorrect()));
         }
-        return new ResolvedQuestion(text, audio, options, languageMode, instructionLanguage, answerLanguage);
+        return new ResolvedQuestion(text, subtitle, audio, options, languageMode, instructionLanguage, answerLanguage);
     }
 
     // ------------------------------------------------------------------------------------------ question

@@ -48,6 +48,12 @@ public final class GameConstants {
      */
     public static final long FEEDBACK_ALLOWANCE_MS = 4000;
 
+    /**
+     * The first question: the client reads the topic name while the session is being created, then waits a moment
+     * after the screen is shown before reading the question. This is the time we allow for that.
+     */
+    public static final long FIRST_QUESTION_ALLOWANCE_MS = 4000;
+
     /** STARTED sessions without activity for this long become ABANDONED (master 5.11). */
     public static final Duration SESSION_INACTIVITY_TIMEOUT = Duration.ofMinutes(30);
 

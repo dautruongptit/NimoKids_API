@@ -411,7 +411,8 @@ public class GameSessionServiceImpl implements GameSessionService {
         if (voice != null && voice.getDurationMs() != null) {
             audioMs = voice.getDurationMs();
         }
-        long feedbackMs = sessionQuestion.getQuestionNumber() > 1 ? GameConstants.FEEDBACK_ALLOWANCE_MS : 0;
+        long feedbackMs = sessionQuestion.getQuestionNumber() > 1
+                ? GameConstants.FEEDBACK_ALLOWANCE_MS : GameConstants.FIRST_QUESTION_ALLOWANCE_MS;
         Instant latestStart = presentedAt.plusMillis(feedbackMs + audioMs + GameConstants.TIMER_START_TOLERANCE_MS);
 
         Instant reported = sessionQuestion.getTimerStartedAt();
