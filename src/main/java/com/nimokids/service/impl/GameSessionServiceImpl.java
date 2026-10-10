@@ -219,7 +219,11 @@ public class GameSessionServiceImpl implements GameSessionService {
         requireStarted(session);
         SessionQuestion current = requireCurrentUnanswered(session, request.questionId());
         if (Boolean.TRUE.equals(request.restart())) {
-            current.setTimerRestartedAt(clock.instant());
+            // At most MAX_LISTEN_AGAIN restarts per question; further calls are ignored (best-effort from the client).
+            if (current.getTimerRestarts() < GameConstants.MAX_LISTEN_AGAIN) {
+                current.setTimerRestarts(current.getTimerRestarts() + 1);
+                current.setTimerRestartedAt(clock.instant());
+            }
         } else if (current.getTimerStartedAt() == null) {
             current.setTimerStartedAt(clock.instant());
         }

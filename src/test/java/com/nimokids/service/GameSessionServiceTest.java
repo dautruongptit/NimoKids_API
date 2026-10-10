@@ -271,6 +271,21 @@ class GameSessionServiceTest {
     }
 
     @Test
+    void listenAgainIsLimitedToTwoRestartsPerQuestion() {
+        startTimer(1);
+        TimerStartRequest restart = new TimerStartRequest(question(1).getId(), true);
+        clock.advance(Duration.ofSeconds(5));
+        service.startTimer(anonymousId, session.getSessionId(), restart);   // 1st restart: accepted
+        clock.advance(Duration.ofSeconds(5));
+        service.startTimer(anonymousId, session.getSessionId(), restart);   // 2nd restart: accepted
+        clock.advance(Duration.ofSeconds(5));
+        service.startTimer(anonymousId, session.getSessionId(), restart);   // 3rd: ignored, the 2nd deadline stands
+        clock.advance(Duration.ofSeconds(4).plusMillis(1));                // just past the 2nd restart deadline (8 s + 1 s grace)
+
+        assertThat(answer(1, 0).result()).isEqualTo(AnswerResult.TIMEOUT);
+    }
+
+    @Test
     void aClientCannotGainTimeByReportingTheStartLate() {
         // Question 1 has no audio: the start can be at most presented + 3 s tolerance, however late the report arrives.
         clock.advance(Duration.ofSeconds(60));

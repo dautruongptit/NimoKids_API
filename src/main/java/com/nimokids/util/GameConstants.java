@@ -6,6 +6,8 @@ import java.time.Duration;
 public final class GameConstants {
 
     public static final int QUESTIONS_PER_SESSION = 5;
+    /** How many times per question the child may press "Listen again" (each one restarts the countdown). */
+    public static final int MAX_LISTEN_AGAIN = 2;
 
     /**
      * Progressive content inheritance for AGE_4_5: 60 % harder (AGE_4_5) and 40 % easy review (AGE_1_3) questions.
