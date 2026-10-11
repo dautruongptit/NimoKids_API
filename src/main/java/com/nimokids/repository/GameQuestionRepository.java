@@ -25,11 +25,12 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
             SELECT q.id
             FROM game_questions q
             JOIN game_modes m ON m.id = q.game_mode_id
-            JOIN answer_items a ON a.id = q.correct_answer_item_id
+            LEFT JOIN answer_items a ON a.id = q.correct_answer_item_id
             LEFT JOIN question_templates qt ON qt.id = q.template_id
             WHERE q.topic_id IN (:topicIds)
               AND q.game_mode_id = :gameModeId
-              AND q.is_active = TRUE AND m.is_active = TRUE AND a.is_active = TRUE
+              AND q.is_active = TRUE AND m.is_active = TRUE
+              AND (q.correct_answer_item_id IS NULL OR a.is_active = TRUE)
               AND q.age_group = ANY(CAST(:ageGroups AS age_group[]))
               AND (m.code <> :soundModeCode OR q.object_sound_id IS NOT NULL)
               AND jsonb_typeof(q.metadata -> 'distractor_rules') = 'array'
@@ -81,8 +82,9 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
             FROM tree tr
             JOIN game_questions q ON q.topic_id = tr.node_id
             JOIN game_modes m ON m.id = q.game_mode_id
-            JOIN answer_items a ON a.id = q.correct_answer_item_id
-            WHERE q.is_active = TRUE AND m.is_active = TRUE AND a.is_active = TRUE
+            LEFT JOIN answer_items a ON a.id = q.correct_answer_item_id
+            WHERE q.is_active = TRUE AND m.is_active = TRUE
+              AND (q.correct_answer_item_id IS NULL OR a.is_active = TRUE)
               AND (m.code <> :soundModeCode OR q.object_sound_id IS NOT NULL)
               AND jsonb_typeof(q.metadata -> 'distractor_rules') = 'array'
             GROUP BY tr.root_id

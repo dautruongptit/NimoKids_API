@@ -2,6 +2,7 @@ package com.nimokids.service;
 
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.SnapshotOption;
+import com.nimokids.service.generation.DynamicQuestion;
 import java.util.List;
 
 public interface OptionGenerator {
@@ -15,4 +16,10 @@ public interface OptionGenerator {
      * @throws com.nimokids.exception.InsufficientDistractorsException when a rule cannot supply enough distinct items
      */
     List<SnapshotOption> generate(GameQuestion question);
+
+    /**
+     * Same, for a dynamic question: the correct item and the condition that proves it come from {@code dynamic} (decided
+     * for this session) instead of the question row. The wrong answers are still checked against that condition.
+     */
+    List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic);
 }

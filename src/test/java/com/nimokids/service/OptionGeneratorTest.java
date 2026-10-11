@@ -17,10 +17,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimokids.entity.AnswerItem;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.MediaAsset;
+import com.nimokids.entity.QuestionVisual;
 import com.nimokids.entity.SnapshotOption;
 import com.nimokids.exception.InsufficientDistractorsException;
 import com.nimokids.exception.InvalidDistractorRulesException;
 import com.nimokids.repository.AnswerItemRepository;
+import com.nimokids.service.generation.DynamicQuestion;
 import com.nimokids.service.impl.OptionGeneratorImpl;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -226,6 +228,73 @@ class OptionGeneratorTest {
 
         assertThatThrownBy(() -> generator.generate(question))
                 .isInstanceOf(InvalidDistractorRulesException.class).hasMessageContaining("correct_match is required");
+    }
+
+    // ------------------------------------------------ dynamic question (HOW_MANY): the answer is decided per session
+
+    private static AnswerItem number(int value) {
+        AnswerItem item = item(String.valueOf(value));
+        item.getMetadata().put("value", value);
+        return item;
+    }
+
+    /** A row with no fixed correct answer item, only a generator and the pool of wrong numbers. */
+    private static GameQuestion dynamicRow() {
+        GameQuestion question = GameQuestion.builder().questionText("How many are there?")
+                .metadata(Map.of("generator", Map.of("type", "COUNT_OBJECTS"),
+                        "distractor_rules", List.of(Map.of("match", Map.of("category", "numbers", "counting", true), "count", 3))))
+                .build();
+        question.setId(UUID.randomUUID());
+        return question;
+    }
+
+    private static DynamicQuestion dynamicFor(AnswerItem correct, int count) {
+        return new DynamicQuestion(correct, Map.of("value", count),
+                new QuestionVisual(QuestionVisual.COUNTING_OBJECTS, "🍎", count), Map.of());
+    }
+
+    @Test
+    void aDynamicQuestionIsGradedAgainstTheItemDecidedForTheSession() {
+        AnswerItem three = number(3);
+        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+                .thenReturn(List.of(number(1), number(2), number(4), number(5)));
+
+        List<SnapshotOption> options = generator.generate(dynamicRow(), dynamicFor(three, 3));
+
+        assertThat(options).hasSize(4);
+        assertThat(options).extracting(SnapshotOption::text).doesNotHaveDuplicates();
+        List<SnapshotOption> right = options.stream().filter(SnapshotOption::isCorrect).toList();
+        assertThat(right).hasSize(1);
+        assertThat(right.get(0).answerItemId()).isEqualTo(three.getId());
+        assertThat(options.stream().filter(o -> !o.isCorrect()).map(SnapshotOption::answerItemId)).doesNotContain(three.getId());
+    }
+
+    @Test
+    void aDynamicQuestionNeverOffersAWrongOptionThatEqualsTheCount() {
+        AnswerItem three = number(3);
+        // the pool wrongly contains another item that is also worth 3: it must be skipped, not shown as a wrong answer
+        AnswerItem alsoThree = number(3);
+        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+                .thenReturn(List.of(alsoThree, number(1), number(2), number(4)));
+
+        List<SnapshotOption> options = generator.generate(dynamicRow(), dynamicFor(three, 3));
+
+        assertThat(options.stream().filter(o -> !o.isCorrect()).map(SnapshotOption::answerItemId))
+                .doesNotContain(alsoThree.getId()).hasSize(3);
+    }
+
+    @Test
+    void aDynamicQuestionFailsInsteadOfInventingWrongAnswersWhenThePoolIsTooSmall() {
+        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(List.of(number(1), number(2)));
+
+        assertThatThrownBy(() -> generator.generate(dynamicRow(), dynamicFor(number(3), 3)))
+                .isInstanceOf(InsufficientDistractorsException.class);
+    }
+
+    @Test
+    void aRowWithNeitherAFixedItemNorAGeneratorOutputIsRejected() {
+        assertThatThrownBy(() -> generator.generate(dynamicRow()))
+                .isInstanceOf(InvalidDistractorRulesException.class).hasMessageContaining("no correct answer item");
     }
 
     @Test

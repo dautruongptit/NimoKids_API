@@ -8,6 +8,7 @@ import com.nimokids.dto.response.GameSessionResponse;
 import com.nimokids.dto.response.NextQuestionResponse;
 import com.nimokids.dto.response.OptionResponse;
 import com.nimokids.dto.response.QuestionResponse;
+import com.nimokids.dto.response.QuestionVisualResponse;
 import com.nimokids.dto.response.StickerResponse;
 import com.nimokids.dto.response.TopicResponse;
 import com.nimokids.dto.response.TopicSummaryResponse;
@@ -66,7 +67,7 @@ public class GameMapper {
             frozen = new QuestionSnapshot(question.getQuestionKey(), null, null, 1, null, null,
                     question.getQuestionText(), null,
                     url(question.getQuestionVoice()), url(question.getObjectSound()),
-                    emoji instanceof String s ? s : null, null, null, null, null, null, null);
+                    emoji instanceof String s ? s : null, null, null, null, null, null, null, null);
         }
         // Everything shown to the child comes from the frozen snapshot (rules 9.7).
         return new QuestionResponse(
@@ -76,6 +77,8 @@ public class GameMapper {
                 frozen.questionVoiceUrl(),
                 frozen.objectSoundUrl(),
                 frozen.questionImage(),
+                frozen.visual() == null ? null
+                        : new QuestionVisualResponse(frozen.visual().type(), frozen.visual().objectImage(), frozen.visual().count()),
                 sessionQuestion.getOptionsSnapshot().stream()
                         .sorted(Comparator.comparingInt(SnapshotOption::displayOrder))
                         .map(option -> new OptionResponse(option.optionId(), option.text(), option.imageUrl(), option.voiceUrl()))

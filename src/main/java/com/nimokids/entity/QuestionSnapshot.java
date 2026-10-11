@@ -1,5 +1,6 @@
 package com.nimokids.entity;
 
+import com.nimokids.service.generation.DynamicQuestion;
 import com.nimokids.service.language.ResolvedQuestion;
 import java.util.Map;
 import java.util.UUID;
@@ -35,12 +36,23 @@ public record QuestionSnapshot(
         Map<String, Object> generation,
         String templateCode,
         String instructionLanguage,
-        String answerLanguage) {
+        String answerLanguage,
+        QuestionVisual visual) {
 
     /** Freezes the question as the child sees it: text and audio already resolved for the session language. */
     public static QuestionSnapshot of(GameQuestion question, ResolvedQuestion resolved) {
-        AnswerItem correct = question.getCorrectAnswerItem();
-        Object emoji = correct != null && correct.getMetadata() != null ? correct.getMetadata().get("emoji") : null;
+        return of(question, resolved, null);
+    }
+
+    /**
+     * {@code dynamic} (null for an ordinary question) carries what was decided for this session: the correct item and
+     * the picture. Its correct item replaces the question row's, and the answer's emoji is not used as the picture
+     * (it would show the answer).
+     */
+    public static QuestionSnapshot of(GameQuestion question, ResolvedQuestion resolved, DynamicQuestion dynamic) {
+        AnswerItem correct = dynamic != null ? dynamic.correctItem() : question.getCorrectAnswerItem();
+        Object emoji = dynamic == null && correct != null && correct.getMetadata() != null
+                ? correct.getMetadata().get("emoji") : null;
         Map<String, Object> metadata = question.getMetadata() != null ? question.getMetadata() : Map.of();
         Map<String, Object> generation = new java.util.LinkedHashMap<>();
         if (metadata.get("distractor_rules") != null) {
@@ -48,6 +60,10 @@ public record QuestionSnapshot(
         }
         if (metadata.get("correct_match") != null) {
             generation.put("correct_match", metadata.get("correct_match"));
+        }
+        if (dynamic != null) {
+            generation.put("correct_match", dynamic.correctMatch());
+            generation.putAll(dynamic.audit());
         }
         return new QuestionSnapshot(
                 question.getQuestionKey(),
@@ -66,6 +82,7 @@ public record QuestionSnapshot(
                 generation,
                 question.getTemplate() != null ? question.getTemplate().getCode() : null,
                 resolved.instructionLanguage(),
-                resolved.answerLanguage());
+                resolved.answerLanguage(),
+                dynamic != null ? dynamic.visual() : null);
     }
 }

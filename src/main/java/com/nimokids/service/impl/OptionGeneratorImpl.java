@@ -11,6 +11,7 @@ import com.nimokids.exception.InvalidDistractorRulesException;
 import com.nimokids.repository.AnswerItemRepository;
 import com.nimokids.service.OptionGenerator;
 import com.nimokids.service.generation.DistractorRule;
+import com.nimokids.service.generation.DynamicQuestion;
 import com.nimokids.service.generation.DistractorRules;
 import com.nimokids.service.generation.TagMatcher;
 import com.nimokids.util.GameConstants;
@@ -46,10 +47,20 @@ public class OptionGeneratorImpl implements OptionGenerator {
     @Override
     @Transactional(readOnly = true)
     public List<SnapshotOption> generate(GameQuestion question) {
-        AnswerItem correct = question.getCorrectAnswerItem();
+        return generate(question, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic) {
+        AnswerItem correct = dynamic != null ? dynamic.correctItem() : question.getCorrectAnswerItem();
+        if (correct == null) {
+            throw new InvalidDistractorRulesException("Question " + question.getId() + " has no correct answer item and no generator");
+        }
         List<DistractorRule> rules = DistractorRules.parse(question.getMetadata(), GameConstants.DISTRACTORS_PER_QUESTION);
 
-        Map<String, Object> correctMatch = DistractorRules.parseCorrectMatch(question.getMetadata());
+        Map<String, Object> correctMatch = dynamic != null ? dynamic.correctMatch()
+                : DistractorRules.parseCorrectMatch(question.getMetadata());
         if (!TagMatcher.satisfies(correct.getMetadata(), correctMatch)) {
             throw new InvalidDistractorRulesException("Question " + question.getId() + ": the correct answer '"
                     + correct.getName() + "' does not satisfy correct_match " + correctMatch);

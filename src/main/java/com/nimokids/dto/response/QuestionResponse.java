@@ -18,5 +18,7 @@ public record QuestionResponse(
         String objectSound,
         /** Emoji or image URL representing the subject of the question (e.g. "🐱" for a question about cats). */
         String questionImage,
+        /** Structured picture of a dynamic question (e.g. draw N objects); null for ordinary questions. */
+        QuestionVisualResponse visual,
         List<OptionResponse> options) {
 }

@@ -18,7 +18,7 @@ VALUES
     ('WHAT_COLOR', 'TEMPLATE', 'COLOR_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "What color is it?"}, "vi": {"text": "Nó có màu gì?"}, "ja": {"text": "何色ですか？"}, "zh": {"text": "它是什么颜色？"}, "ko": {"text": "무슨 색이에요?"}}', '{"bank_key": "Q03", "status": "ACTIVE", "target": "item", "topics": ["COLORS"], "distractors": {"from": "category", "count": 3}}', TRUE),
     ('WHAT_SHAPE', 'TEMPLATE', 'SHAPE_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "What shape is it?"}, "vi": {"text": "Nó có hình gì?"}, "ja": {"text": "何の形ですか？"}, "zh": {"text": "它是什么形状？"}, "ko": {"text": "무슨 모양이에요?"}}', '{"bank_key": "Q04", "status": "ACTIVE", "target": "item", "topics": ["SHAPES"], "distractors": {"from": "category", "count": 3}}', TRUE),
     ('WHAT_NUMBER', 'TEMPLATE', 'NUMBER_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "What number is this?"}, "vi": {"text": "Đây là số mấy?"}, "ja": {"text": "これは何の数字ですか？"}, "zh": {"text": "这是几？"}}', '{"bank_key": "Q05", "status": "ACTIVE", "target": "item", "topics": ["NUMBERS"], "distractors": {"from": "category", "count": 3}}', TRUE),
-    ('HOW_MANY', 'TEMPLATE', 'COUNTING', 'AGE_1_3', 1, '{"en": {"text": "How many are there?"}, "vi": {"text": "Có bao nhiêu cái?"}, "ja": {"text": "いくつありますか？"}, "zh": {"text": "有几个？"}, "ko": {"text": "몇 개 있어요?"}}', '{"bank_key": "Q06", "status": "PLANNED", "reason": "needs a generated picture of N objects (counting generator)"}', FALSE),
+    ('HOW_MANY', 'TEMPLATE', 'COUNTING', 'AGE_1_3', 1, '{"en": {"text": "How many are there?"}, "vi": {"text": "Có bao nhiêu cái?"}, "ja": {"text": "いくつありますか？"}, "zh": {"text": "有几个？"}, "ko": {"text": "몇 개 있어요?"}}', '{"bank_key": "Q06", "status": "ACTIVE", "target": "dynamic", "generator": "COUNT_OBJECTS", "topics": ["NUMBERS"], "slots": 3, "min": 1, "max": 5}', TRUE),
     ('WHO_SAYS', 'TEMPLATE', 'SOUND_TO_ANIMAL', 'AGE_1_3', 1, '{"en": {"text": "Who makes this sound?"}, "vi": {"text": "Ai phát ra âm thanh này?"}, "ja": {"text": "これは誰の声ですか？"}, "zh": {"text": "这是谁的声音？"}, "ko": {"text": "누구의 소리예요?"}}', '{"bank_key": "Q07", "status": "PLANNED", "reason": "needs animal sound files"}', FALSE),
     ('WHO_CAN_FLY', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_1_3', 1, '{"en": {"text": "Who can fly?"}, "vi": {"text": "Ai có thể bay?"}, "ja": {"text": "誰が飛べますか？"}, "zh": {"text": "谁会飞？"}, "ko": {"text": "누가 날 수 있어요?"}}', '{"bank_key": "Q08", "status": "PLANNED", "reason": "needs the can_fly tag on answer items"}', FALSE),
     ('WHO_CAN_SWIM', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_1_3', 1, '{"en": {"text": "Who can swim?"}, "vi": {"text": "Ai có thể bơi?"}, "ja": {"text": "誰が泳げますか？"}, "zh": {"text": "谁会游泳？"}}', '{"bank_key": "Q09", "status": "PLANNED", "reason": "needs the can_swim tag on answer items"}', FALSE),
@@ -52,7 +52,8 @@ VALUES
     ('PLUS_3_1', 'TEMPLATE', 'SIMPLE_ADDITION', 'AGE_4_5', 2, '{"en": {"text": "What is 3 plus 1?"}, "vi": {"text": "3 cộng 1 bằng mấy?"}, "ja": {"text": "3たす1はいくつですか？"}, "zh": {"text": "3加1等于几？"}}', '{"bank_key": "Q37", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
     ('MINUS_3_1', 'TEMPLATE', 'SIMPLE_SUBTRACTION', 'AGE_4_5', 2, '{"en": {"text": "What is 3 minus 1?"}, "vi": {"text": "3 trừ 1 bằng mấy?"}, "ja": {"text": "3ひく1はいくつですか？"}, "zh": {"text": "3减1等于几？"}}', '{"bank_key": "Q38", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
     ('MINUS_4_1', 'TEMPLATE', 'SIMPLE_SUBTRACTION', 'AGE_4_5', 2, '{"en": {"text": "What is 4 minus 1?"}, "vi": {"text": "4 trừ 1 bằng mấy?"}, "ja": {"text": "4ひく1はいくつですか？"}, "zh": {"text": "4减1等于几？"}}', '{"bank_key": "Q39", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
-    ('MISSING_NUMBER', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "Which number is missing?"}, "vi": {"text": "Số nào còn thiếu?"}, "ja": {"text": "どの数字が足りませんか？"}, "zh": {"text": "缺少哪个数字？"}}', '{"bank_key": "Q40", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE)
+    ('MISSING_NUMBER', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "Which number is missing?"}, "vi": {"text": "Số nào còn thiếu?"}, "ja": {"text": "どの数字が足りませんか？"}, "zh": {"text": "缺少哪个数字？"}}', '{"bank_key": "Q40", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
+    ('WHAT_LETTER', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "What letter is this?"}, "vi": {"text": "Đây là chữ gì?"}}', '{"bank_key": "EXT-01", "status": "ACTIVE", "target": "item", "topics": ["ALPHABET"], "distractors": {"from": "category", "count": 3}}', TRUE)
 ON CONFLICT (code) DO UPDATE
     SET question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty,
         i18n = EXCLUDED.i18n, generation = EXCLUDED.generation, is_active = EXCLUDED.is_active, updated_at = now()
@@ -90,6 +91,28 @@ FROM (VALUES
 ) AS v(code, tag)
 WHERE a.code = v.code AND a.metadata ->> 'lookalike' IS DISTINCT FROM v.tag;
 
+-- 2b. Counting data (HOW_MANY) -------------------------------------------------------------------------------------
+--     value    : the number an item stands for (a real number, so the answer is found by value, never by name).
+--     counting : the numbers a counting question may use (1-5 today); wrong answers are drawn from them too.
+--     countable: single things that look good repeated N times (emoji today, a picture later).
+UPDATE answer_items a
+SET metadata = a.metadata || jsonb_build_object('value', v.n)
+FROM (VALUES ('NUMBERS_ONE', 1), ('NUMBERS_TWO', 2), ('NUMBERS_THREE', 3), ('NUMBERS_FOUR', 4), ('NUMBERS_FIVE', 5),
+             ('NUMBERS_SIX', 6), ('NUMBERS_SEVEN', 7), ('NUMBERS_EIGHT', 8), ('NUMBERS_NINE', 9), ('NUMBERS_TEN', 10))
+     AS v(code, n)
+WHERE a.code = v.code AND (a.metadata -> 'value') IS DISTINCT FROM to_jsonb(v.n);
+
+UPDATE answer_items
+SET metadata = metadata || '{"counting": true}'::jsonb
+WHERE code IN ('NUMBERS_ONE', 'NUMBERS_TWO', 'NUMBERS_THREE', 'NUMBERS_FOUR', 'NUMBERS_FIVE')
+  AND (metadata -> 'counting') IS DISTINCT FROM 'true'::jsonb;
+
+UPDATE answer_items
+SET metadata = metadata || '{"countable": true}'::jsonb
+WHERE code IN ('FRUITS_APPLE', 'FRUITS_BANANA', 'FRUITS_ORANGE', 'TOYS_BALL', 'FARM_ANIMALS_DUCK', 'SHAPES_STAR',
+               'ANIMALS_CAT', 'ANIMALS_DOG', 'VEHICLES_CAR')
+  AND (metadata -> 'countable') IS DISTINCT FROM 'true'::jsonb;
+
 -- 3. One question per (template, topic, answer item) --------------------------------------------------------------
 INSERT INTO game_questions
     (id, topic_id, game_mode_id, question_text, correct_answer_item_id, difficulty, min_age, max_age, display_order,
@@ -110,7 +133,38 @@ CROSS JOIN LATERAL jsonb_array_elements_text(tpl.generation -> 'topics') AS tc(c
 JOIN topics t ON t.code = tc.code AND t.is_active
 JOIN answer_items i ON i.metadata ->> 'category' = lower(t.code) AND i.is_active
 JOIN game_modes m ON m.code = 'GUESS'
-WHERE tpl.kind = 'TEMPLATE' AND tpl.is_active
+WHERE tpl.kind = 'TEMPLATE' AND tpl.is_active AND tpl.generation ->> 'generator' IS NULL
+ON CONFLICT (id) DO UPDATE
+    SET question_text = EXCLUDED.question_text, metadata = EXCLUDED.metadata, template_id = EXCLUDED.template_id,
+        question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty,
+        is_active = TRUE, updated_at = now();
+
+-- 3b. Dynamic questions (generator templates): a few rows per topic, NO fixed answer item ---------------------------
+--     The count and the object are drawn for every session (DynamicQuestionService). The row only says how to draw
+--     them (metadata.generator) and where wrong answers come from. "slots" rows let one session meet it more than once.
+INSERT INTO game_questions
+    (id, topic_id, game_mode_id, question_text, correct_answer_item_id, difficulty, min_age, max_age, display_order,
+     metadata, is_active, question_key, age_group, question_type, template_id)
+SELECT md5('nimokids:template-question:' || tpl.code || ':' || tc.code || ':' || slot.n)::uuid,
+       t.id, m.id, tpl.i18n #>> '{en,text}', NULL, tpl.difficulty, 1, 5,
+       200 + slot.n,
+       jsonb_build_object(
+           'generator', jsonb_build_object(
+               'type', tpl.generation ->> 'generator',
+               'min', COALESCE((tpl.generation ->> 'min')::int, 1),
+               'max', COALESCE((tpl.generation ->> 'max')::int, 5),
+               'object_match', jsonb_build_object('countable', true),
+               'number_match', jsonb_build_object('category', 'numbers', 'counting', true)),
+           'distractor_rules', jsonb_build_array(jsonb_build_object(
+               'match', jsonb_build_object('category', 'numbers', 'counting', true), 'count', 3)),
+           'source', 'TEMPLATE'),
+       TRUE, 'TPL_' || tpl.code || '_' || tc.code || '_' || slot.n, tpl.age_group, tpl.question_type, tpl.id
+FROM question_templates tpl
+CROSS JOIN LATERAL jsonb_array_elements_text(tpl.generation -> 'topics') AS tc(code)
+CROSS JOIN LATERAL generate_series(1, COALESCE((tpl.generation ->> 'slots')::int, 1)) AS slot(n)
+JOIN topics t ON t.code = tc.code AND t.is_active
+JOIN game_modes m ON m.code = 'GUESS'
+WHERE tpl.kind = 'TEMPLATE' AND tpl.is_active AND tpl.generation ->> 'generator' IS NOT NULL
 ON CONFLICT (id) DO UPDATE
     SET question_text = EXCLUDED.question_text, metadata = EXCLUDED.metadata, template_id = EXCLUDED.template_id,
         question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty,
@@ -121,3 +175,12 @@ UPDATE game_questions q
 SET is_active = FALSE, updated_at = now()
 FROM question_templates tpl
 WHERE q.template_id = tpl.id AND tpl.kind = 'TEMPLATE' AND NOT tpl.is_active AND q.is_active;
+
+-- 4. Only template questions are used -------------------------------------------------------------------------------
+--    CURATED questions (hand-written, no template or from a CURATED template) are deactivated so they never appear
+--    regardless of the TEMPLATE_ONLY_FROM threshold.  Rows are kept for history; only is_active is flipped.
+UPDATE game_questions
+SET is_active = FALSE, updated_at = now()
+WHERE is_active
+  AND (template_id IS NULL
+       OR template_id IN (SELECT id FROM question_templates WHERE kind <> 'TEMPLATE'));

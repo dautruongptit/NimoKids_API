@@ -29,6 +29,7 @@ import com.nimokids.entity.GameMode;
 import com.nimokids.entity.GameQuestion;
 import com.nimokids.entity.GameSession;
 import com.nimokids.entity.MediaAsset;
+import com.nimokids.entity.QuestionVisual;
 import com.nimokids.entity.SessionQuestion;
 import com.nimokids.entity.SnapshotOption;
 import com.nimokids.entity.Topic;
@@ -41,6 +42,7 @@ import com.nimokids.exception.BusinessException;
 import com.nimokids.exception.ErrorCode;
 import com.nimokids.exception.InsufficientDistractorsException;
 import com.nimokids.exception.InsufficientQuestionsException;
+import com.nimokids.exception.InvalidDistractorRulesException;
 import com.nimokids.exception.InvalidOptionException;
 import com.nimokids.exception.OptionNotBelongToQuestionException;
 import com.nimokids.exception.QuestionAlreadyAnsweredException;
@@ -56,6 +58,7 @@ import com.nimokids.repository.GameQuestionRepository;
 import com.nimokids.repository.GameSessionRepository;
 import com.nimokids.repository.PlayerStickerRepository;
 import com.nimokids.repository.TopicRepository;
+import com.nimokids.service.generation.DynamicQuestion;
 import com.nimokids.service.impl.GameSessionServiceImpl;
 import java.time.Clock;
 import java.time.Duration;
@@ -65,6 +68,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -86,6 +90,7 @@ class GameSessionServiceTest {
     private final StickerService stickerService = mock(StickerService.class);
     private final ActivityLogService activityLogService = mock(ActivityLogService.class);
     private final OptionGenerator optionGenerator = mock(OptionGenerator.class);
+    private final DynamicQuestionService dynamicQuestions = mock(DynamicQuestionService.class);
     private final LanguageResolverService languageResolver = mock(LanguageResolverService.class);
     private final MutableClock clock = new MutableClock(START);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -102,7 +107,7 @@ class GameSessionServiceTest {
     void setUp() {
         service = new GameSessionServiceImpl(
                 sessionRepository, questionRepository, topicRepository, gameModeRepository, playerRepository,
-                playerStickerRepository, playerService, stickerService, activityLogService, optionGenerator,
+                playerStickerRepository, playerService, stickerService, activityLogService, optionGenerator, dynamicQuestions,
                 languageResolver, new GameMapper(), clock);
         when(languageResolver.resolve(any(), any())).thenAnswer(invocation -> {
             QuestionInstance instance = invocation.getArgument(1);
@@ -626,6 +631,179 @@ class GameSessionServiceTest {
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
                 .isInstanceOf(TopicNotPlayableException.class);
+    }
+
+    // ------------------------------------------------------- dynamic (HOW_MANY)
+
+    @Test
+    void dynamicQuestionsKeepPictureAnswerAndSnapshotConsistentAcrossTheWholeSession() throws Exception {
+        Map<UUID, DynamicQuestion> dynamicByQuestion = stubDynamicCreate();
+
+        GameSession created = createAndCapture();
+
+        assertThat(created.getSessionQuestions()).hasSize(5);
+        Set<Integer> counts = new HashSet<>();
+        for (SessionQuestion sq : created.getSessionQuestions()) {
+            DynamicQuestion dynamic = dynamicByQuestion.get(sq.getQuestion().getId());
+            QuestionVisual visual = sq.getQuestionSnapshot().visual();
+            // the picture shows exactly N objects, and the graded option is the number item whose value is N
+            assertThat(visual.type()).isEqualTo(QuestionVisual.COUNTING_OBJECTS);
+            assertThat(visual.count()).isEqualTo(dynamic.visual().count());
+            counts.add(visual.count());
+            assertThat(sq.getQuestionSnapshot().questionImage()).isNull();
+            assertThat(sq.getQuestionSnapshot().correctAnswerItemId()).isEqualTo(dynamic.correctItem().getId());
+            assertThat(sq.getQuestionSnapshot().generation()).containsEntry("count", visual.count());
+            assertThat(sq.getOptionsSnapshot()).hasSize(4);
+            assertThat(sq.getOptionsSnapshot().stream().map(SnapshotOption::text).distinct()).hasSize(4);
+            List<SnapshotOption> right = sq.getOptionsSnapshot().stream().filter(SnapshotOption::isCorrect).toList();
+            assertThat(right).hasSize(1);
+            assertThat(right.get(0).answerItemId()).isEqualTo(dynamic.correctItem().getId());
+            assertThat(right.get(0).text()).isEqualTo(String.valueOf(visual.count()));
+        }
+        assertThat(counts).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
+    }
+
+    @Test
+    void aDynamicQuestionPayloadRevealsNothingThatPointsAtTheRightOption() throws Exception {
+        stubDynamicCreate();
+        GameSessionResponse response = service.createSession(
+                anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
+        ArgumentCaptor<GameSession> saved = ArgumentCaptor.forClass(GameSession.class);
+        verify(sessionRepository).save(saved.capture());
+        SessionQuestion first = saved.getValue().getSessionQuestions().get(0);
+        SnapshotOption right = first.getOptionsSnapshot().stream().filter(SnapshotOption::isCorrect).findFirst().orElseThrow();
+
+        com.fasterxml.jackson.databind.JsonNode json = objectMapper.valueToTree(response);
+        com.fasterxml.jackson.databind.JsonNode question = json.get("question");
+
+        // Whole response, not only "isCorrect": no correctness word, no item ids, no answer-revealing extra field.
+        String text = json.toString();
+        assertThat(text).doesNotContainIgnoringCase("correct");
+        assertThat(text).doesNotContain(right.answerItemId().toString());
+        assertThat(fieldNames(question)).containsExactlyInAnyOrder(
+                "id", "questionText", "questionTextVi", "questionVoice", "objectSound", "questionImage", "visual", "options");
+        assertThat(fieldNames(question.get("visual"))).containsExactlyInAnyOrder("type", "objectImage", "count");
+        assertThat(question.get("questionImage").isNull()).isTrue();
+        assertThat(question.get("visual").get("count").asInt()).isEqualTo(first.getQuestionSnapshot().visual().count());
+        for (com.fasterxml.jackson.databind.JsonNode option : question.get("options")) {
+            assertThat(fieldNames(option)).containsExactlyInAnyOrder("id", "text", "image", "voice");
+        }
+    }
+
+    @Test
+    void dynamicQuestionsAreGradedFromTheirSnapshotForCorrectWrongAndTimeout() {
+        stubDynamicCreate();
+        GameSession created = createAndCapture();
+        when(sessionRepository.findBySessionIdForUpdate(created.getSessionId())).thenReturn(Optional.of(created));
+        when(sessionRepository.findBySessionId(created.getSessionId())).thenReturn(Optional.of(created));
+
+        SessionQuestion q1 = created.getSessionQuestions().get(0);
+        SessionQuestion q2 = created.getSessionQuestions().get(1);
+        SessionQuestion q3 = created.getSessionQuestions().get(2);
+        UUID rightId = q1.getOptionsSnapshot().stream().filter(SnapshotOption::isCorrect).findFirst().orElseThrow().optionId();
+        UUID wrongId = q2.getOptionsSnapshot().stream().filter(o -> !o.isCorrect()).findFirst().orElseThrow().optionId();
+
+        // correct: score and streak go up, the next question (with its own picture) travels with the answer
+        AnswerResponse first = service.submitAnswer(anonymousId, created.getSessionId(),
+                new SubmitAnswerRequest(q1.getQuestion().getId(), rightId));
+        assertThat(first.result()).isEqualTo(AnswerResult.CORRECT);
+        assertThat(first.score()).isEqualTo(1);
+        assertThat(first.currentStreak()).isEqualTo(1);
+        assertThat(first.correctAnswer().id()).isEqualTo(rightId);
+        assertThat(first.hasNextQuestion()).isTrue();
+        assertThat(first.nextQuestion().questionNumber()).isEqualTo(2);
+        assertThat(first.nextQuestion().question().visual().count()).isEqualTo(q2.getQuestionSnapshot().visual().count());
+
+        // the same question cannot be scored twice
+        assertThatThrownBy(() -> service.submitAnswer(anonymousId, created.getSessionId(),
+                new SubmitAnswerRequest(q1.getQuestion().getId(), rightId)))
+                .isInstanceOf(QuestionAlreadyAnsweredException.class);
+        assertThat(created.getScore()).isEqualTo((short) 1);
+
+        // wrong: score kept, streak reset, the right option is revealed only now
+        AnswerResponse second = service.submitAnswer(anonymousId, created.getSessionId(),
+                new SubmitAnswerRequest(q2.getQuestion().getId(), wrongId));
+        assertThat(second.result()).isEqualTo(AnswerResult.WRONG);
+        assertThat(second.score()).isEqualTo(1);
+        assertThat(second.currentStreak()).isZero();
+        assertThat(second.correctAnswer().id()).isEqualTo(
+                q2.getOptionsSnapshot().stream().filter(SnapshotOption::isCorrect).findFirst().orElseThrow().optionId());
+
+        // timeout: counted once, streak stays at zero, the session moves on
+        AnswerResponse third = service.submitTimeout(anonymousId, created.getSessionId(),
+                new SubmitTimeoutRequest(q3.getQuestion().getId()));
+        assertThat(third.result()).isEqualTo(AnswerResult.TIMEOUT);
+        assertThat(third.score()).isEqualTo(1);
+        assertThat(third.nextQuestion().questionNumber()).isEqualTo(4);
+        assertThat(created.getSessionQuestions().get(3).getQuestionSnapshot().visual()).isNotNull();
+    }
+
+    @Test
+    void aDynamicQuestionThatCannotBeGeneratedIsSkippedAndReplaced() {
+        Map<UUID, DynamicQuestion> dynamicByQuestion = stubDynamicCreate();
+        GameQuestion broken = newDynamicQuestion();
+        when(questionRepository.findById(broken.getId())).thenReturn(Optional.of(broken));
+        when(dynamicQuestions.prepare(broken)).thenThrow(new InvalidDistractorRulesException("no countable object"));
+        List<UUID> ids = new ArrayList<>(dynamicByQuestion.keySet());
+        ids.add(0, broken.getId());
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class))).thenReturn(ids);
+
+        GameSession created = createAndCapture();
+
+        assertThat(created.getSessionQuestions()).hasSize(5);
+        assertThat(created.getSessionQuestions().stream().map(sq -> sq.getQuestion().getId())).doesNotContain(broken.getId());
+    }
+
+    /** 5 dynamic questions whose counts are 1..5; each one decides a different correct number item. */
+    private Map<UUID, DynamicQuestion> stubDynamicCreate() {
+        Map<UUID, DynamicQuestion> byQuestion = new java.util.LinkedHashMap<>();
+        for (int next = 1; next <= 5; next++) {
+            final int count = next;
+            GameQuestion question = newDynamicQuestion();
+            AnswerItem number = AnswerItem.builder().code("NUMBERS_" + count).name(String.valueOf(count)).build();
+            number.setId(UUID.randomUUID());
+            number.getMetadata().put("value", count);
+            DynamicQuestion dynamic = new DynamicQuestion(number, Map.of("value", count),
+                    new QuestionVisual(QuestionVisual.COUNTING_OBJECTS, "🍎", count),
+                    Map.of("generator", "COUNT_OBJECTS", "count", count));
+            byQuestion.put(question.getId(), dynamic);
+            when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+            when(dynamicQuestions.prepare(question)).thenReturn(Optional.of(dynamic));
+            when(optionGenerator.generate(question, dynamic)).thenAnswer(invocation -> {
+                List<SnapshotOption> options = new ArrayList<>();
+                options.add(new SnapshotOption(UUID.randomUUID(), number.getId(), number.getName(), null, null, 1, true));
+                int shown = 2;
+                for (int other = 1; other <= 5 && shown <= 4; other++) {
+                    if (other != count) {
+                        options.add(new SnapshotOption(UUID.randomUUID(), UUID.randomUUID(), String.valueOf(other), null, null, shown++, false));
+                    }
+                }
+                return options;
+            });
+        }
+        when(playerService.resolveOrCreate(anonymousId)).thenReturn(player);
+        when(topicRepository.findById(topic.getId())).thenReturn(Optional.of(topic));
+        when(gameModeRepository.findById(mode.getId())).thenReturn(Optional.of(mode));
+        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId()));
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class)))
+                .thenReturn(new ArrayList<>(byQuestion.keySet()));
+        return byQuestion;
+    }
+
+    /** A HOW_MANY row: no fixed correct answer item, only a generator. */
+    private GameQuestion newDynamicQuestion() {
+        GameQuestion question = GameQuestion.builder()
+                .topic(topic).gameMode(mode).questionText("How many are there?")
+                .metadata(Map.of("generator", Map.of("type", "COUNT_OBJECTS")))
+                .difficulty((short) 1).minAge((short) 1).maxAge((short) 5).build();
+        question.setId(UUID.randomUUID());
+        return question;
+    }
+
+    private static List<String> fieldNames(com.fasterxml.jackson.databind.JsonNode node) {
+        List<String> names = new ArrayList<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names;
     }
 
     // ------------------------------------------------------------- fixtures

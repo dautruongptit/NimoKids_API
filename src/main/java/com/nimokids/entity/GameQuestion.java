@@ -58,8 +58,9 @@ public class GameQuestion extends BaseEntity {
     @JoinColumn(name = "object_sound_id")
     private MediaAsset objectSound;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "correct_answer_item_id", nullable = false)
+    /** Null only for a dynamic question (metadata.generator): its correct answer is decided per session. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "correct_answer_item_id")
     private AnswerItem correctAnswerItem;
 
     @Column(name = "explanation", columnDefinition = "TEXT")

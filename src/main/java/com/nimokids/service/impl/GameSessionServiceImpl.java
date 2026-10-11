@@ -50,7 +50,9 @@ import com.nimokids.repository.PlayerStickerRepository;
 import com.nimokids.repository.TopicRepository;
 import com.nimokids.service.ActivityLogService;
 import com.nimokids.service.GameSessionService;
+import com.nimokids.service.DynamicQuestionService;
 import com.nimokids.service.OptionGenerator;
+import com.nimokids.service.generation.DynamicQuestion;
 import com.nimokids.service.PlayerService;
 import com.nimokids.service.StickerService;
 import com.nimokids.util.GameConstants;
@@ -85,6 +87,7 @@ public class GameSessionServiceImpl implements GameSessionService {
     private final StickerService stickerService;
     private final ActivityLogService activityLogService;
     private final OptionGenerator optionGenerator;
+    private final DynamicQuestionService dynamicQuestions;
     private final LanguageResolverService languageResolver;
     private final GameMapper mapper;
     private final Clock clock;
@@ -172,9 +175,13 @@ public class GameSessionServiceImpl implements GameSessionService {
                 continue;
             }
             ResolvedQuestion resolved;
+            DynamicQuestion dynamic;
             try {
+                // 0) a dynamic question (HOW_MANY) decides its correct answer and picture for THIS session.
+                dynamic = dynamicQuestions.prepare(question).orElse(null);
                 // 1) generate (language-free)  2) resolve the language  3) save: the resolver is the last step.
-                List<SnapshotOption> generated = optionGenerator.generate(question);
+                List<SnapshotOption> generated = dynamic == null
+                        ? optionGenerator.generate(question) : optionGenerator.generate(question, dynamic);
                 resolved = languageResolver.resolve(languageMode, new QuestionInstance(question, generated));
             } catch (BusinessException ex) {
                 log.warn("Skipping question {}: {}", candidateId, ex.getMessage());
@@ -185,7 +192,7 @@ public class GameSessionServiceImpl implements GameSessionService {
                     .question(question)
                     .questionNumber((short) accepted)
                     .optionsSnapshot(resolved.options())
-                    .questionSnapshot(QuestionSnapshot.of(question, resolved))
+                    .questionSnapshot(QuestionSnapshot.of(question, resolved, dynamic))
                     .presentedAt(accepted == 1 ? now : null)
                     .build());
         }
