@@ -2,6 +2,9 @@ package com.nimokids.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -52,7 +55,7 @@ class DynamicQuestionServiceTest {
 
     /** Repository stub: the object query returns {@code object}; the number query returns the item whose value matches. */
     private void stubData(AnswerItem object) {
-        when(repository.findRandomActive(anyString(), anyInt())).thenAnswer(invocation -> {
+        when(repository.findRandomActive(anyString(), anyInt(), anyBoolean())).thenAnswer(invocation -> {
             JsonNode match = JSON.readTree(invocation.<String>getArgument(0));
             if (match.has("value")) {
                 int value = match.get("value").asInt();
@@ -116,7 +119,7 @@ class DynamicQuestionServiceTest {
 
     @Test
     void missingDataIsRejectedInsteadOfInventingAnAnswer() {
-        when(repository.findRandomActive(anyString(), anyInt())).thenReturn(List.of());
+        when(repository.findRandomActive(anyString(), anyInt(), anyBoolean())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service(new Random(1)).prepare(howMany(countObjects(1, 5))))
                 .isInstanceOf(InvalidDistractorRulesException.class).hasMessageContaining("no active item");
@@ -133,5 +136,16 @@ class DynamicQuestionServiceTest {
         assertThatThrownBy(() -> service(new Random(1)).prepare(howMany(
                 Map.of("type", "COUNT_OBJECTS", "number_match", Map.of("counting", true)))))
                 .isInstanceOf(InvalidDistractorRulesException.class).hasMessageContaining("object_match");
+    }
+
+    @Test
+    void theBasicEnglishRestrictionIsAppliedToTheObjectAndTheNumberItem() {
+        stubData(item("FRUITS_APPLE", Map.of("emoji", "🍎", "countable", true)));
+
+        service(new Random(5)).prepare(howMany(countObjects(1, 5)), true).orElseThrow();
+        verify(repository, org.mockito.Mockito.times(2)).findRandomActive(anyString(), anyInt(), eq(true));
+
+        service(new Random(5)).prepare(howMany(countObjects(1, 5))).orElseThrow();
+        verify(repository, org.mockito.Mockito.times(2)).findRandomActive(anyString(), anyInt(), eq(false));
     }
 }

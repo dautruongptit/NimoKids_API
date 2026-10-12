@@ -27,6 +27,15 @@ public enum LanguageMode {
         return this == VI ? "vi" : "en";
     }
 
+    /**
+     * True when the mode only uses basic English vocabulary ({@code AnswerItem.basicEnglish}): VI_EN, where a child
+     * hears Vietnamese and picks English, is kept simple on purpose. Which topics a mode offers is data, see
+     * {@code Topic.supportedModes}.
+     */
+    public boolean basicEnglishOnly() {
+        return this == VI_EN;
+    }
+
     /** True when topics (which are not part of the question/answer i18n) are served in Vietnamese. */
     public boolean servesVietnamese() {
         return this == VI;

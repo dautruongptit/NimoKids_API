@@ -12,5 +12,10 @@ public interface DynamicQuestionService {
      * @throws com.nimokids.exception.InvalidDistractorRulesException when the generator is malformed or the data it
      *         needs is missing; the session skips such a question and takes another one
      */
-    Optional<DynamicQuestion> prepare(GameQuestion question);
+    default Optional<DynamicQuestion> prepare(GameQuestion question) {
+        return prepare(question, false);
+    }
+
+    /** {@code basicEnglishOnly}: the object and the number item drawn for the question are basic English words. */
+    Optional<DynamicQuestion> prepare(GameQuestion question, boolean basicEnglishOnly);
 }

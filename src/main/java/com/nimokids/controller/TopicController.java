@@ -21,13 +21,13 @@ public class TopicController {
     private final TopicService topicService;
 
     @GetMapping
-    public ApiResponse<List<TopicResponse>> getTopics(@RequestParam(required = false) LanguageMode languageMode) {
-        return ApiResponse.success(topicService.getPlayableTopics(languageMode != null ? languageMode : LanguageMode.EN));
+    public ApiResponse<List<TopicResponse>> getTopics(@RequestParam(required = false) LanguageMode mode) {
+        return ApiResponse.success(topicService.getPlayableTopics(mode != null ? mode : LanguageMode.EN));
     }
 
     @GetMapping("/{topicId}")
     public ApiResponse<TopicResponse> getTopic(@PathVariable UUID topicId,
-                                               @RequestParam(required = false) LanguageMode languageMode) {
-        return ApiResponse.success(topicService.getTopic(topicId, languageMode != null ? languageMode : LanguageMode.EN));
+                                               @RequestParam(required = false) LanguageMode mode) {
+        return ApiResponse.success(topicService.getTopic(topicId, mode != null ? mode : LanguageMode.EN));
     }
 }

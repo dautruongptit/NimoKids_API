@@ -1,6 +1,7 @@
 package com.nimokids.repository;
 
 import com.nimokids.entity.GameQuestion;
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.util.GameConstants;
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +19,9 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
      * {@code ageGroups} contains the PostgreSQL enum literals to filter on (e.g. ['AGE_1_3'] or ['AGE_1_3','AGE_4_5']).
      * An empty collection means no age filter.
      *
+     * {@code basicEnglishOnly} keeps only questions whose correct answer is a basic English word (an item with
+     * {@code is_basic_english}); a dynamic question has no fixed answer item and is not filtered here.
+     *
      * Whether the distractor pool is really large enough is checked when the options are generated (and on admin
      * save); a question that cannot produce 4 options is skipped and replaced.
      */
@@ -31,6 +35,7 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
               AND q.game_mode_id = :gameModeId
               AND q.is_active = TRUE AND m.is_active = TRUE
               AND (q.correct_answer_item_id IS NULL OR a.is_active = TRUE)
+              AND (:basicEnglishOnly = FALSE OR q.correct_answer_item_id IS NULL OR a.is_basic_english = TRUE)
               AND q.age_group = ANY(CAST(:ageGroups AS age_group[]))
               AND (m.code <> :soundModeCode OR q.object_sound_id IS NOT NULL)
               AND jsonb_typeof(q.metadata -> 'distractor_rules') = 'array'
@@ -43,7 +48,12 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
                       AND g.age_group = q.age_group AND g.is_active = TRUE) < :templateOnlyFrom)
             """, nativeQuery = true)
     List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode,
-                                int templateOnlyFrom);
+                                int templateOnlyFrom, boolean basicEnglishOnly);
+
+    default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode,
+                                        int templateOnlyFrom) {
+        return findCandidateIds(topicIds, gameModeId, ageGroups, soundModeCode, templateOnlyFrom, false);
+    }
 
     /** Without the template preference (every active question is a candidate). */
     default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups, String soundModeCode) {
@@ -52,8 +62,14 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
 
     /** What a game session uses: short template questions are preferred (see {@link GameConstants#TEMPLATE_ONLY_FROM}). */
     default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups) {
+        return findCandidateIds(topicIds, gameModeId, ageGroups, false);
+    }
+
+    /** What a game session uses; {@code basicEnglishOnly} comes from the language mode of the session. */
+    default List<UUID> findCandidateIds(Collection<UUID> topicIds, UUID gameModeId, String[] ageGroups,
+                                        boolean basicEnglishOnly) {
         return findCandidateIds(topicIds, gameModeId, ageGroups, GameConstants.ANIMAL_SOUND_MODE_CODE,
-                GameConstants.TEMPLATE_ONLY_FROM);
+                GameConstants.TEMPLATE_ONLY_FROM, basicEnglishOnly);
     }
 
     /**
@@ -71,12 +87,17 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
     /**
      * Topics that are playable: active, with at least {@code minCount} valid questions in their whole subtree
      * (a parent can be playable through its children). Counted over all game modes.
+     *
+     * {@code languageMode} (a LanguageMode name, null = any) keeps only the topics that support it, at every level of the
+     * tree, and {@code basicEnglishOnly} counts only questions whose answer is a basic English word.
      */
     @Query(value = """
             WITH RECURSIVE tree(root_id, node_id) AS (
                 SELECT id, id FROM topics WHERE is_active = TRUE
+                  AND (CAST(:languageMode AS text) IS NULL OR CAST(:languageMode AS text) = ANY(supported_modes))
                 UNION
                 SELECT tr.root_id, t.id FROM tree tr JOIN topics t ON t.parent_id = tr.node_id WHERE t.is_active = TRUE
+                  AND (CAST(:languageMode AS text) IS NULL OR CAST(:languageMode AS text) = ANY(t.supported_modes))
             )
             SELECT tr.root_id
             FROM tree tr
@@ -85,15 +106,26 @@ public interface GameQuestionRepository extends JpaRepository<GameQuestion, UUID
             LEFT JOIN answer_items a ON a.id = q.correct_answer_item_id
             WHERE q.is_active = TRUE AND m.is_active = TRUE
               AND (q.correct_answer_item_id IS NULL OR a.is_active = TRUE)
+              AND (:basicEnglishOnly = FALSE OR q.correct_answer_item_id IS NULL OR a.is_basic_english = TRUE)
               AND (m.code <> :soundModeCode OR q.object_sound_id IS NOT NULL)
               AND jsonb_typeof(q.metadata -> 'distractor_rules') = 'array'
             GROUP BY tr.root_id
             HAVING count(*) >= :minCount
             """, nativeQuery = true)
-    List<UUID> findPlayableTopicIds(long minCount, String soundModeCode);
+    List<UUID> findPlayableTopicIds(long minCount, String soundModeCode, String languageMode, boolean basicEnglishOnly);
+
+    default List<UUID> findPlayableTopicIds(long minCount, String soundModeCode) {
+        return findPlayableTopicIds(minCount, soundModeCode, null, false);
+    }
 
     default List<UUID> findPlayableTopicIds(long minCount) {
         return findPlayableTopicIds(minCount, GameConstants.ANIMAL_SOUND_MODE_CODE);
+    }
+
+    /** Playable topics for a language mode (what GET /topics?mode=... lists). */
+    default List<UUID> findPlayableTopicIds(long minCount, LanguageMode languageMode) {
+        return findPlayableTopicIds(minCount, GameConstants.ANIMAL_SOUND_MODE_CODE, languageMode.name(),
+                languageMode.basicEnglishOnly());
     }
 
     /** Loads questions with everything a session snapshot reads, in ONE query (instead of ~6 lazy loads per question). */

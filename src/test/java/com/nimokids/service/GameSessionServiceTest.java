@@ -4,12 +4,14 @@ import com.nimokids.service.language.ResolvedQuestion;
 import com.nimokids.service.language.QuestionInstance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -36,6 +38,7 @@ import com.nimokids.entity.Topic;
 import com.nimokids.entity.enums.ActivityEventType;
 import com.nimokids.entity.enums.AgeGroup;
 import com.nimokids.entity.enums.AnswerResult;
+import com.nimokids.entity.enums.LanguageMode;
 import com.nimokids.entity.enums.SessionStatus;
 import com.nimokids.exception.AnswerTimeoutException;
 import com.nimokids.exception.BusinessException;
@@ -563,13 +566,13 @@ class GameSessionServiceTest {
     void createSessionDrawsFromTheWholeTopicSubtree() {
         List<GameQuestion> pool = stubCreate(6);
         UUID childTopic = UUID.randomUUID();
-        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId(), childTopic));
-        when(questionRepository.findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), any(String[].class)))
+        when(topicRepository.findActiveSubtreeIds(eq(topic.getId()), any())).thenReturn(List.of(topic.getId(), childTopic));
+        when(questionRepository.findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), any(String[].class), anyBoolean()))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
 
         service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
 
-        verify(questionRepository).findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), any(String[].class));
+        verify(questionRepository).findCandidateIds(eq(List.of(topic.getId(), childTopic)), eq(mode.getId()), any(String[].class), anyBoolean());
     }
 
     @Test
@@ -577,19 +580,19 @@ class GameSessionServiceTest {
         List<GameQuestion> pool = stubCreate(6);
         // AGE_4_5 reads the two pools separately (60 % AGE_4_5 / 40 % AGE_1_3); here only the AGE_4_5 pool has questions.
         when(questionRepository.findCandidateIds(any(), any(), argThat((String[] groups) -> groups != null
-                && groups.length == 1 && groups[0].equals("AGE_4_5"))))
+                && groups.length == 1 && groups[0].equals("AGE_4_5")), anyBoolean()))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
 
         service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), AgeGroup.AGE_4_5));
 
         verify(questionRepository).findCandidateIds(any(), eq(mode.getId()), argThat((String[] groups) -> groups != null
-                && groups.length == 1 && groups[0].equals("AGE_1_3")));
+                && groups.length == 1 && groups[0].equals("AGE_1_3")), anyBoolean());
     }
 
     @Test
     void aQuestionThatCannotProduceOptionsIsSkippedAndReplaced() {
         List<GameQuestion> pool = stubCreate(7);
-        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(0), null, false)).thenThrow(new InsufficientDistractorsException("pool shrank"));
         // The first candidate may be any of the 7 after shuffling, so make one specific question always fail.
         GameSession created = createAndCapture();
 
@@ -600,8 +603,8 @@ class GameSessionServiceTest {
     @Test
     void createSessionFailsWhenFewerThanFiveQuestionsCanProduceOptions() {
         List<GameQuestion> pool = stubCreate(6);
-        when(optionGenerator.generate(pool.get(0))).thenThrow(new InsufficientDistractorsException("pool shrank"));
-        when(optionGenerator.generate(pool.get(1))).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(0), null, false)).thenThrow(new InsufficientDistractorsException("pool shrank"));
+        when(optionGenerator.generate(pool.get(1), null, false)).thenThrow(new InsufficientDistractorsException("pool shrank"));
 
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
@@ -622,7 +625,7 @@ class GameSessionServiceTest {
     @Test
     void createSessionRejectsInactiveTopicAndTopicWithoutActiveSubtree() {
         stubCreate(6);
-        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of());
+        when(topicRepository.findActiveSubtreeIds(eq(topic.getId()), any())).thenReturn(List.of());
         assertThatThrownBy(() -> service.createSession(
                 anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null)))
                 .isInstanceOf(TopicNotPlayableException.class);
@@ -743,10 +746,10 @@ class GameSessionServiceTest {
         Map<UUID, DynamicQuestion> dynamicByQuestion = stubDynamicCreate();
         GameQuestion broken = newDynamicQuestion();
         when(questionRepository.findById(broken.getId())).thenReturn(Optional.of(broken));
-        when(dynamicQuestions.prepare(broken)).thenThrow(new InvalidDistractorRulesException("no countable object"));
+        when(dynamicQuestions.prepare(broken, false)).thenThrow(new InvalidDistractorRulesException("no countable object"));
         List<UUID> ids = new ArrayList<>(dynamicByQuestion.keySet());
         ids.add(0, broken.getId());
-        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class))).thenReturn(ids);
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class), anyBoolean())).thenReturn(ids);
 
         GameSession created = createAndCapture();
 
@@ -768,8 +771,8 @@ class GameSessionServiceTest {
                     Map.of("generator", "COUNT_OBJECTS", "count", count));
             byQuestion.put(question.getId(), dynamic);
             when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
-            when(dynamicQuestions.prepare(question)).thenReturn(Optional.of(dynamic));
-            when(optionGenerator.generate(question, dynamic)).thenAnswer(invocation -> {
+            when(dynamicQuestions.prepare(question, false)).thenReturn(Optional.of(dynamic));
+            when(optionGenerator.generate(question, dynamic, false)).thenAnswer(invocation -> {
                 List<SnapshotOption> options = new ArrayList<>();
                 options.add(new SnapshotOption(UUID.randomUUID(), number.getId(), number.getName(), null, null, 1, true));
                 int shown = 2;
@@ -784,8 +787,8 @@ class GameSessionServiceTest {
         when(playerService.resolveOrCreate(anonymousId)).thenReturn(player);
         when(topicRepository.findById(topic.getId())).thenReturn(Optional.of(topic));
         when(gameModeRepository.findById(mode.getId())).thenReturn(Optional.of(mode));
-        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId()));
-        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class)))
+        when(topicRepository.findActiveSubtreeIds(eq(topic.getId()), any())).thenReturn(List.of(topic.getId()));
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class), anyBoolean()))
                 .thenReturn(new ArrayList<>(byQuestion.keySet()));
         return byQuestion;
     }
@@ -822,13 +825,13 @@ class GameSessionServiceTest {
             GameQuestion question = newQuestion();
             pool.add(question);
             when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
-            when(optionGenerator.generate(question)).thenAnswer(invocation -> newSnapshot());
+            when(optionGenerator.generate(question, null, false)).thenAnswer(invocation -> newSnapshot());
         }
         when(playerService.resolveOrCreate(anonymousId)).thenReturn(player);
         when(topicRepository.findById(topic.getId())).thenReturn(Optional.of(topic));
         when(gameModeRepository.findById(mode.getId())).thenReturn(Optional.of(mode));
-        when(topicRepository.findActiveSubtreeIds(topic.getId())).thenReturn(List.of(topic.getId()));
-        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class)))
+        when(topicRepository.findActiveSubtreeIds(eq(topic.getId()), any())).thenReturn(List.of(topic.getId()));
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class), anyBoolean()))
                 .thenReturn(pool.stream().map(GameQuestion::getId).toList());
         return pool;
     }
@@ -920,5 +923,64 @@ class GameSessionServiceTest {
         public Instant instant() {
             return now;
         }
+    }
+
+    @Test
+    void aViEnSessionOnlyUsesTheTopicsAndTheBasicWordsMarkedForTheMode() {
+        List<GameQuestion> pool = stubCreate(6);
+        when(topicRepository.findActiveSubtreeIds(topic.getId(), "VI_EN")).thenReturn(List.of(topic.getId()));
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class), eq(true)))
+                .thenReturn(pool.stream().map(GameQuestion::getId).toList());
+        when(optionGenerator.generate(any(), isNull(), eq(true))).thenAnswer(invocation -> newSnapshot());
+
+        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null, LanguageMode.VI_EN));
+
+        verify(topicRepository).findActiveSubtreeIds(topic.getId(), "VI_EN");
+        verify(questionRepository).findCandidateIds(any(), eq(mode.getId()), any(String[].class), eq(true));
+        verify(dynamicQuestions, times(5)).prepare(any(), eq(true));
+        verify(optionGenerator, times(5)).generate(any(), isNull(), eq(true));
+    }
+
+    @Test
+    void aViSessionKeepsTheWholeVocabulary() {
+        List<GameQuestion> pool = stubCreate(6);
+        when(topicRepository.findActiveSubtreeIds(topic.getId(), "VI")).thenReturn(List.of(topic.getId()));
+        when(questionRepository.findCandidateIds(any(), eq(mode.getId()), any(String[].class), eq(false)))
+                .thenReturn(pool.stream().map(GameQuestion::getId).toList());
+
+        service.createSession(anonymousId, new CreateGameSessionRequest(topic.getId(), mode.getId(), null, LanguageMode.VI));
+
+        verify(topicRepository).findActiveSubtreeIds(topic.getId(), "VI");
+        verify(questionRepository).findCandidateIds(any(), eq(mode.getId()), any(String[].class), eq(false));
+        verify(dynamicQuestions, times(5)).prepare(any(), eq(false));
+    }
+
+    @Test
+    void aTopicThatDoesNotSupportTheModeIsNotPlayable() {
+        stubCreate(6);
+        when(topicRepository.findActiveSubtreeIds(topic.getId(), "VI_EN")).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.createSession(anonymousId,
+                new CreateGameSessionRequest(topic.getId(), mode.getId(), null, LanguageMode.VI_EN)))
+                .isInstanceOf(com.nimokids.exception.TopicNotPlayableException.class);
+    }
+
+    @Test
+    void aWordIsAskedOnlyOnceInASessionEvenWhenSeveralWordingsAskForIt() {
+        List<GameQuestion> pool = stubCreate(7);
+        // questions 1 and 2 ask for the same word with two wordings ("What is this?" / "What do you see?")
+        pool.get(1).setCorrectAnswerItem(pool.get(0).getCorrectAnswerItem());
+
+        GameSessionResponse created = service.createSession(anonymousId,
+                new CreateGameSessionRequest(topic.getId(), mode.getId(), null));
+
+        assertThat(created.totalQuestions()).isEqualTo(5);
+        // the candidates are shuffled: whichever of the two comes first is used, the other is skipped
+        int usedOfTheTwo = mockingDetails(optionGenerator).getInvocations().stream()
+                .filter(call -> call.getMethod().getName().equals("generate"))
+                .map(call -> call.getArgument(0))
+                .filter(question -> question == pool.get(0) || question == pool.get(1))
+                .toList().size();
+        assertThat(usedOfTheTwo).isEqualTo(1);
     }
 }

@@ -22,16 +22,22 @@ public interface AnswerItemRepository extends JpaRepository<AnswerItem, UUID> {
      *
      * @param match       JSON object such as {"category":"animal","can_fly":false}
      * @param excludedIds never empty: always contains the correct answer item
+     * @param basicEnglishOnly true = only basic English words (is_basic_english), false = the whole vocabulary
      */
     @Query(value = """
             SELECT * FROM answer_items
             WHERE is_active = TRUE
               AND metadata @> CAST(:match AS jsonb)
               AND id NOT IN (:excludedIds)
+              AND (:basicEnglishOnly = FALSE OR is_basic_english = TRUE)
             ORDER BY random()
             LIMIT :limit
             """, nativeQuery = true)
-    List<AnswerItem> findRandomMatching(String match, Collection<UUID> excludedIds, int limit);
+    List<AnswerItem> findRandomMatching(String match, Collection<UUID> excludedIds, int limit, boolean basicEnglishOnly);
+
+    default List<AnswerItem> findRandomMatching(String match, Collection<UUID> excludedIds, int limit) {
+        return findRandomMatching(match, excludedIds, limit, false);
+    }
 
     /** Loads the image and voice of the given items in ONE query so reading them later costs no extra round trips. */
     @Query("SELECT DISTINCT a FROM AnswerItem a LEFT JOIN FETCH a.image LEFT JOIN FETCH a.voice WHERE a.id IN :ids")
@@ -45,8 +51,13 @@ public interface AnswerItemRepository extends JpaRepository<AnswerItem, UUID> {
             SELECT * FROM answer_items
             WHERE is_active = TRUE
               AND metadata @> CAST(:match AS jsonb)
+              AND (:basicEnglishOnly = FALSE OR is_basic_english = TRUE)
             ORDER BY random()
             LIMIT :limit
             """, nativeQuery = true)
-    List<AnswerItem> findRandomActive(String match, int limit);
+    List<AnswerItem> findRandomActive(String match, int limit, boolean basicEnglishOnly);
+
+    default List<AnswerItem> findRandomActive(String match, int limit) {
+        return findRandomActive(match, limit, false);
+    }
 }

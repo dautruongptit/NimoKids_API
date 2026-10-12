@@ -15,11 +15,21 @@ public interface OptionGenerator {
      * @throws com.nimokids.exception.InvalidDistractorRulesException  when the rules are missing or malformed
      * @throws com.nimokids.exception.InsufficientDistractorsException when a rule cannot supply enough distinct items
      */
-    List<SnapshotOption> generate(GameQuestion question);
+    default List<SnapshotOption> generate(GameQuestion question) {
+        return generate(question, null, false);
+    }
 
     /**
      * Same, for a dynamic question: the correct item and the condition that proves it come from {@code dynamic} (decided
      * for this session) instead of the question row. The wrong answers are still checked against that condition.
      */
-    List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic);
+    default List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic) {
+        return generate(question, dynamic, false);
+    }
+
+    /**
+     * Full form. {@code dynamic} is null for an ordinary question. {@code basicEnglishOnly} (from the language mode of
+     * the session) limits the wrong answers to basic English words, like the correct answer already is.
+     */
+    List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic, boolean basicEnglishOnly);
 }

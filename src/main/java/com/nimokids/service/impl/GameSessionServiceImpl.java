@@ -62,9 +62,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
@@ -105,6 +107,11 @@ public class GameSessionServiceImpl implements GameSessionService {
         Instant now = clock.instant();
         AnonymousPlayer player = playerService.resolveOrCreate(anonymousId);
 
+        LanguageMode languageMode = request.resolvedLanguageMode();
+        // The mode decides which topics and which words are offered (Topic.supportedModes, AnswerItem.basicEnglish).
+        String modeName = languageMode.name();
+        boolean basicEnglishOnly = languageMode.basicEnglishOnly();
+
         // MIX mode: topicId is null — draw from all active root topics.
         Topic topic;
         List<UUID> subtree;
@@ -114,13 +121,13 @@ public class GameSessionServiceImpl implements GameSessionService {
             if (!topic.isActive()) {
                 throw new TopicNotPlayableException();
             }
-            subtree = topicRepository.findActiveSubtreeIds(topic.getId());
+            subtree = topicRepository.findActiveSubtreeIds(topic.getId(), modeName);
             if (subtree.isEmpty()) {
                 throw new TopicNotPlayableException();
             }
         } else {
             topic = null;
-            subtree = topicRepository.findAllActiveSubtreeIds();
+            subtree = topicRepository.findAllActiveSubtreeIds(modeName);
             if (subtree.isEmpty()) {
                 throw new TopicNotPlayableException();
             }
@@ -133,18 +140,17 @@ public class GameSessionServiceImpl implements GameSessionService {
         }
 
         AgeGroup ageGroup = request.resolvedAgeGroup();
-        LanguageMode languageMode = request.resolvedLanguageMode();
         String[] ageGroups = ageGroup.inheritedGroupNames().toArray(String[]::new);
         List<UUID> candidateIds;
         if (ageGroup == AgeGroup.AGE_4_5) {
-            List<UUID> hard = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_4_5.name()}));
-            List<UUID> easy = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_1_3.name()}));
+            List<UUID> hard = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_4_5.name()}, basicEnglishOnly));
+            List<UUID> easy = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_1_3.name()}, basicEnglishOnly));
             if (hard.size() + easy.size() < GameConstants.QUESTIONS_PER_SESSION) {
                 throw new InsufficientQuestionsException();
             }
             candidateIds = mixByAgeGroup(hard, easy);
         } else {
-            candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), ageGroups));
+            candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), ageGroups, basicEnglishOnly));
             if (candidateIds.size() < GameConstants.QUESTIONS_PER_SESSION) {
                 throw new InsufficientQuestionsException();
             }
@@ -166,6 +172,8 @@ public class GameSessionServiceImpl implements GameSessionService {
                 .forEach(loaded -> preloaded.put(loaded.getId(), loaded));
 
         int accepted = 0;
+        // Several wordings can ask for the same word ("What is this?" / "What do you see?"): a word is asked once per session.
+        Set<UUID> askedAnswerItems = new HashSet<>();
         for (UUID candidateId : candidateIds) {
             if (accepted == GameConstants.QUESTIONS_PER_SESSION) {
                 break;
@@ -174,20 +182,26 @@ public class GameSessionServiceImpl implements GameSessionService {
             if (question == null) {
                 continue;
             }
+            UUID fixedAnswerItem = question.getCorrectAnswerItem() != null ? question.getCorrectAnswerItem().getId() : null;
+            if (fixedAnswerItem != null && askedAnswerItems.contains(fixedAnswerItem)) {
+                continue;
+            }
             ResolvedQuestion resolved;
             DynamicQuestion dynamic;
             try {
                 // 0) a dynamic question (HOW_MANY) decides its correct answer and picture for THIS session.
-                dynamic = dynamicQuestions.prepare(question).orElse(null);
+                dynamic = dynamicQuestions.prepare(question, basicEnglishOnly).orElse(null);
                 // 1) generate (language-free)  2) resolve the language  3) save: the resolver is the last step.
-                List<SnapshotOption> generated = dynamic == null
-                        ? optionGenerator.generate(question) : optionGenerator.generate(question, dynamic);
+                List<SnapshotOption> generated = optionGenerator.generate(question, dynamic, basicEnglishOnly);
                 resolved = languageResolver.resolve(languageMode, new QuestionInstance(question, generated));
             } catch (BusinessException ex) {
                 log.warn("Skipping question {}: {}", candidateId, ex.getMessage());
                 continue;
             }
             accepted++;
+            if (fixedAnswerItem != null) {
+                askedAnswerItems.add(fixedAnswerItem);
+            }
             session.addSessionQuestion(SessionQuestion.builder()
                     .question(question)
                     .questionNumber((short) accepted)

@@ -56,7 +56,7 @@ public class DynamicQuestionServiceImpl implements DynamicQuestionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<DynamicQuestion> prepare(GameQuestion question) {
+    public Optional<DynamicQuestion> prepare(GameQuestion question, boolean basicEnglishOnly) {
         Map<String, Object> metadata = question.getMetadata();
         Object raw = metadata == null ? null : metadata.get(GENERATOR_KEY);
         if (raw == null) {
@@ -69,10 +69,10 @@ public class DynamicQuestionServiceImpl implements DynamicQuestionService {
         if (!COUNT_OBJECTS.equals(type)) {
             throw new InvalidDistractorRulesException("Unknown question generator: " + type);
         }
-        return Optional.of(countObjects(question, generator));
+        return Optional.of(countObjects(question, generator, basicEnglishOnly));
     }
 
-    private DynamicQuestion countObjects(GameQuestion question, Map<?, ?> generator) {
+    private DynamicQuestion countObjects(GameQuestion question, Map<?, ?> generator, boolean basicEnglishOnly) {
         int min = intOf(generator.get("min"), DEFAULT_MIN);
         int max = intOf(generator.get("max"), DEFAULT_MAX);
         if (min < 1 || max < min || max > LIMIT_MAX) {
@@ -82,11 +82,11 @@ public class DynamicQuestionServiceImpl implements DynamicQuestionService {
         int count = random.nextInt(min, max + 1);
 
         AnswerItem object = first(matchOf(generator.get("object_match"), "object_match"), Map.of(),
-                "a countable object", question);
+                "a countable object", question, basicEnglishOnly);
         String objectImage = objectImageOf(object, question);
 
         AnswerItem number = first(matchOf(generator.get("number_match"), "number_match"), Map.of("value", count),
-                "the number item with value " + count, question);
+                "the number item with value " + count, question, basicEnglishOnly);
 
         Map<String, Object> audit = new LinkedHashMap<>();
         audit.put("generator", COUNT_OBJECTS);
@@ -97,10 +97,11 @@ public class DynamicQuestionServiceImpl implements DynamicQuestionService {
                 new QuestionVisual(QuestionVisual.COUNTING_OBJECTS, objectImage, count), audit);
     }
 
-    private AnswerItem first(Map<String, Object> match, Map<String, Object> extra, String what, GameQuestion question) {
+    private AnswerItem first(Map<String, Object> match, Map<String, Object> extra, String what, GameQuestion question,
+                             boolean basicEnglishOnly) {
         Map<String, Object> all = new LinkedHashMap<>(match);
         all.putAll(extra);
-        List<AnswerItem> found = answerItemRepository.findRandomActive(toJson(all), 1);
+        List<AnswerItem> found = answerItemRepository.findRandomActive(toJson(all), 1, basicEnglishOnly);
         if (found.isEmpty()) {
             throw new InvalidDistractorRulesException("Question " + question.getId() + ": no active item for " + what + " " + all);
         }

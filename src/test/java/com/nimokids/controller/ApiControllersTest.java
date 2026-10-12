@@ -103,6 +103,17 @@ class ApiControllersTest {
     }
 
     @Test
+    void theModeQueryParameterSelectsTheTopicsOfThatLanguageMode() throws Exception {
+        when(topicService.getPlayableTopics(LanguageMode.VI_EN)).thenReturn(List.of(new TopicResponse(
+                topicId, null, "COLORS", "Colors", "colors", null, null, null, 1, 5, 1)));
+
+        mockMvc.perform(get("/api/v1/topics").param("mode", "VI_EN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].code").value("COLORS"));
+        org.mockito.Mockito.verify(topicService).getPlayableTopics(LanguageMode.VI_EN);
+    }
+
+    @Test
     void requestIdIsGeneratedWhenMissingOrMalformed() throws Exception {
         when(gameModeService.getActiveGameModes()).thenReturn(List.of(new GameModeResponse(modeId, "GUESS", "Guess", null)));
 

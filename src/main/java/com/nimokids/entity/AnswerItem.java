@@ -61,4 +61,9 @@ public class AnswerItem extends BaseEntity {
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
+
+    /** A basic English word (true) or a hard one (false); modes that restrict to basic English skip the hard ones. */
+    @Builder.Default
+    @Column(name = "is_basic_english", nullable = false)
+    private boolean basicEnglish = true;
 }

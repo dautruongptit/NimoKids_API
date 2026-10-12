@@ -2,6 +2,7 @@ package com.nimokids.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -62,7 +63,7 @@ class OptionGeneratorTest {
     @Test
     void buildsFourDistinctShuffledOptionsWithExactlyOneCorrect() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(item("Dog"), item("Cat"), item("Cow")));
 
         List<SnapshotOption> options = generator.generate(question(bird, singleRule()));
@@ -80,7 +81,7 @@ class OptionGeneratorTest {
     void optionIdsAreFreshAndDifferentFromTheAnswerItemIds() {
         AnswerItem bird = item("Bird");
         List<AnswerItem> wrong = List.of(item("Dog"), item("Cat"), item("Cow"));
-        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(wrong);
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean())).thenReturn(wrong);
 
         List<SnapshotOption> options = generator.generate(question(bird, singleRule()));
 
@@ -93,7 +94,7 @@ class OptionGeneratorTest {
     @Test
     void theOrderIsActuallyShuffledAcrossManyRuns() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(item("Dog"), item("Cat"), item("Cow")));
 
         Set<Integer> positionsOfTheCorrectOption = new HashSet<>();
@@ -108,7 +109,7 @@ class OptionGeneratorTest {
     @Test
     void wrongAnswersAreSearchedByExplicitTagMatchingAndNeverByNegation() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(item("Dog"), item("Cat"), item("Cow")));
 
         generator.generate(question(bird, singleRule()));
@@ -116,7 +117,7 @@ class OptionGeneratorTest {
         ArgumentCaptor<String> match = ArgumentCaptor.forClass(String.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Collection<UUID>> excluded = ArgumentCaptor.forClass(Collection.class);
-        verify(repository).findRandomMatching(match.capture(), excluded.capture(), eq(24));
+        verify(repository).findRandomMatching(match.capture(), excluded.capture(), eq(24), anyBoolean());
         assertThat(match.getValue()).contains("\"category\":\"animal\"").contains("\"can_fly\":false");
         assertThat(match.getValue()).doesNotContainIgnoringCase("not").doesNotContain("!").doesNotContain("true");
         assertThat(excluded.getValue()).containsExactly(bird.getId());   // only the correct item itself is excluded
@@ -131,23 +132,23 @@ class OptionGeneratorTest {
         Object rules = List.of(
                 Map.of("match", Map.of("habitat", "forest"), "count", 2),
                 Map.of("match", Map.of("habitat", "water"), "count", 1));
-        when(repository.findRandomMatching(argThat(json -> json != null && json.contains("forest")), any(), anyInt()))
+        when(repository.findRandomMatching(argThat(json -> json != null && json.contains("forest")), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(lion, monkey));
-        when(repository.findRandomMatching(argThat(json -> json != null && json.contains("water")), any(), anyInt()))
+        when(repository.findRandomMatching(argThat(json -> json != null && json.contains("water")), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(fish));
 
         List<SnapshotOption> options = generator.generate(question(cow, rules));
 
         assertThat(options).extracting(SnapshotOption::text).containsExactlyInAnyOrder("Cow", "Lion", "Monkey", "Fish");
         ArgumentCaptor<Collection<UUID>> excluded = ArgumentCaptor.forClass(Collection.class);
-        verify(repository, times(2)).findRandomMatching(anyString(), excluded.capture(), anyInt());
+        verify(repository, times(2)).findRandomMatching(anyString(), excluded.capture(), anyInt(), anyBoolean());
         assertThat(excluded.getAllValues().get(1)).contains(cow.getId(), lion.getId(), monkey.getId());
     }
 
     @Test
     void candidatesWithTheSameNameAreSkippedSoTheChildNeverSeesTwoIdenticalWords() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean())).thenReturn(
                 List.of(item("Dog"), item("dog"), item("Bird"), item("Cat"), item("Cow")));
 
         List<SnapshotOption> options = generator.generate(question(bird, singleRule()));
@@ -158,12 +159,12 @@ class OptionGeneratorTest {
     @Test
     void aPoolThatCannotSupplyEnoughItemsFailsInsteadOfPaddingWithSomethingElse() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(List.of(item("Dog"), item("Cat")));
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean())).thenReturn(List.of(item("Dog"), item("Cat")));
 
         assertThatThrownBy(() -> generator.generate(question(bird, singleRule())))
                 .isInstanceOf(InsufficientDistractorsException.class)
                 .hasMessageContaining("needs 3");
-        verify(repository, times(1)).findRandomMatching(anyString(), any(), anyInt());
+        verify(repository, times(1)).findRandomMatching(anyString(), any(), anyInt(), anyBoolean());
     }
 
     @Test
@@ -175,7 +176,7 @@ class OptionGeneratorTest {
         assertThatThrownBy(() -> generator.generate(noRules)).isInstanceOf(InvalidDistractorRulesException.class);
         assertThatThrownBy(() -> generator.generate(question(bird, List.of(Map.of("match", Map.of("a", "b"), "count", 2)))))
                 .isInstanceOf(InvalidDistractorRulesException.class);
-        verify(repository, never()).findRandomMatching(anyString(), any(), anyInt());
+        verify(repository, never()).findRandomMatching(anyString(), any(), anyInt(), anyBoolean());
     }
 
     private static AnswerItem tagged(String name, Object canFly) {
@@ -188,7 +189,7 @@ class OptionGeneratorTest {
     void aWrongAnswerThatCouldAlsoBeRightIsNeverShown() {
         AnswerItem bird = item("Bird");
         // The pool is too broad: Eagle and Bee also fly, and Duck lists both values.
-        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(List.of(
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean())).thenReturn(List.of(
                 tagged("Eagle", true), tagged("Bee", true), tagged("Duck", List.of(false, true)),
                 tagged("Dog", false), tagged("Cat", false), tagged("Cow", false)));
 
@@ -200,7 +201,7 @@ class OptionGeneratorTest {
     @Test
     void ifTooFewSafeWrongAnswersRemainTheQuestionFailsInsteadOfShowingAnAmbiguousOne() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(List.of(
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean())).thenReturn(List.of(
                 tagged("Eagle", true), tagged("Bee", true), tagged("Dog", false), tagged("Cat", false)));
 
         assertThatThrownBy(() -> generator.generate(question(bird, singleRule())))
@@ -216,7 +217,7 @@ class OptionGeneratorTest {
 
         assertThatThrownBy(() -> generator.generate(question))
                 .isInstanceOf(InvalidDistractorRulesException.class).hasMessageContaining("does not satisfy correct_match");
-        verify(repository, never()).findRandomMatching(anyString(), any(), anyInt());
+        verify(repository, never()).findRandomMatching(anyString(), any(), anyInt(), anyBoolean());
     }
 
     @Test
@@ -256,7 +257,7 @@ class OptionGeneratorTest {
     @Test
     void aDynamicQuestionIsGradedAgainstTheItemDecidedForTheSession() {
         AnswerItem three = number(3);
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(number(1), number(2), number(4), number(5)));
 
         List<SnapshotOption> options = generator.generate(dynamicRow(), dynamicFor(three, 3));
@@ -274,7 +275,7 @@ class OptionGeneratorTest {
         AnswerItem three = number(3);
         // the pool wrongly contains another item that is also worth 3: it must be skipped, not shown as a wrong answer
         AnswerItem alsoThree = number(3);
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(alsoThree, number(1), number(2), number(4)));
 
         List<SnapshotOption> options = generator.generate(dynamicRow(), dynamicFor(three, 3));
@@ -285,7 +286,7 @@ class OptionGeneratorTest {
 
     @Test
     void aDynamicQuestionFailsInsteadOfInventingWrongAnswersWhenThePoolIsTooSmall() {
-        when(repository.findRandomMatching(anyString(), any(), anyInt())).thenReturn(List.of(number(1), number(2)));
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean())).thenReturn(List.of(number(1), number(2)));
 
         assertThatThrownBy(() -> generator.generate(dynamicRow(), dynamicFor(number(3), 3)))
                 .isInstanceOf(InsufficientDistractorsException.class);
@@ -302,7 +303,7 @@ class OptionGeneratorTest {
         AnswerItem bird = item("Bird");
         bird.setImage(MediaAsset.builder().name("bird").storageUrl("https://cdn/bird.png").build());
         bird.setVoice(MediaAsset.builder().name("bird-v").storageUrl("https://cdn/bird.mp3").build());
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(item("Dog"), item("Cat"), item("Cow")));
 
         List<SnapshotOption> options = generator.generate(question(bird, singleRule()));
@@ -316,7 +317,7 @@ class OptionGeneratorTest {
     @Test
     void severalGenerationsOfTheSameQuestionProduceIndependentSnapshots() {
         AnswerItem bird = item("Bird");
-        when(repository.findRandomMatching(anyString(), any(), anyInt()))
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
                 .thenReturn(List.of(item("Dog"), item("Cat"), item("Cow")));
         GameQuestion question = question(bird, singleRule());
 
@@ -324,5 +325,18 @@ class OptionGeneratorTest {
         List<UUID> second = new ArrayList<>(generator.generate(question).stream().map(SnapshotOption::optionId).toList());
 
         assertThat(second).doesNotContainAnyElementsOf(first);
+    }
+
+    @Test
+    void theBasicEnglishRestrictionOfTheModeIsPassedToTheWrongAnswerQuery() {
+        AnswerItem bird = item("Bird");
+        when(repository.findRandomMatching(anyString(), any(), anyInt(), anyBoolean()))
+                .thenReturn(List.of(item("Dog"), item("Cat"), item("Cow")));
+
+        generator.generate(question(bird, singleRule()), null, true);
+        verify(repository).findRandomMatching(anyString(), any(), anyInt(), eq(true));
+
+        generator.generate(question(bird, singleRule()));
+        verify(repository).findRandomMatching(anyString(), any(), anyInt(), eq(false));
     }
 }

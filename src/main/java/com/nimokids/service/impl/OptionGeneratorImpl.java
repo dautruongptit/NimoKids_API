@@ -46,13 +46,7 @@ public class OptionGeneratorImpl implements OptionGenerator {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SnapshotOption> generate(GameQuestion question) {
-        return generate(question, null);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic) {
+    public List<SnapshotOption> generate(GameQuestion question, DynamicQuestion dynamic, boolean basicEnglishOnly) {
         AnswerItem correct = dynamic != null ? dynamic.correctItem() : question.getCorrectAnswerItem();
         if (correct == null) {
             throw new InvalidDistractorRulesException("Question " + question.getId() + " has no correct answer item and no generator");
@@ -74,7 +68,7 @@ public class OptionGeneratorImpl implements OptionGenerator {
         List<AnswerItem> distractors = new ArrayList<>();
         for (DistractorRule rule : rules) {
             List<AnswerItem> candidates = answerItemRepository.findRandomMatching(
-                    toJson(rule), List.copyOf(excludedIds), rule.count() * CANDIDATES_PER_PICK);
+                    toJson(rule), List.copyOf(excludedIds), rule.count() * CANDIDATES_PER_PICK, basicEnglishOnly);
             if (!candidates.isEmpty()) {
                 answerItemRepository.findAllWithMedia(candidates.stream().map(AnswerItem::getId).toList());
             }

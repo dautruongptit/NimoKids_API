@@ -29,8 +29,8 @@ public class TopicServiceImpl implements TopicService {
     @Transactional(readOnly = true)
     public List<TopicResponse> getPlayableTopics(LanguageMode languageMode) {
         Set<UUID> playableTopicIds = Set.copyOf(
-                questionRepository.findPlayableTopicIds(GameConstants.MIN_PLAYABLE_QUESTIONS_PER_TOPIC));
-        return topicRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
+                questionRepository.findPlayableTopicIds(GameConstants.MIN_PLAYABLE_QUESTIONS_PER_TOPIC, languageMode));
+        return topicRepository.findActiveSupportingMode(languageMode.name()).stream()
                 .filter(topic -> playableTopicIds.contains(topic.getId()))
                 .map(topic -> mapper.toTopicResponse(topic, languageMode))
                 .toList();
@@ -41,7 +41,7 @@ public class TopicServiceImpl implements TopicService {
     public TopicResponse getTopic(UUID topicId, LanguageMode languageMode) {
         Topic topic = topicRepository.findById(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic", topicId));
-        if (!topic.isActive()) {
+        if (!topic.isActive() || !topic.supports(languageMode)) {
             throw new TopicNotPlayableException();
         }
         return mapper.toTopicResponse(topic, languageMode);

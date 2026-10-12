@@ -11,6 +11,8 @@ import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -71,6 +73,16 @@ public class Topic extends BaseEntity {
     @Builder.Default
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
+
+    /** Language modes (LanguageMode names) this topic can be played in; GET /topics and the session engine filter on it. */
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "supported_modes", nullable = false, columnDefinition = "varchar(20)[]", length = 20)
+    private List<String> supportedModes = new ArrayList<>(List.of("VI", "EN", "VI_EN"));
+
+    public boolean supports(LanguageMode mode) {
+        return supportedModes.contains(mode.name());
+    }
 
     /** Parent topic (column parent_id), or null for a root. Choosing a root draws questions from its whole subtree. */
     @ManyToOne(fetch = FetchType.LAZY)
