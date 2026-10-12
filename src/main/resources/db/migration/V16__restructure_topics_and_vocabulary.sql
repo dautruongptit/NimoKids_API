@@ -1,13 +1,10 @@
 -- Vocabulary v2 (source: NimoKids_Vocabulary_Clean_v2.xlsx): the topic tree and every answer item.
--- REPEATABLE and idempotent. It lives in db/migration (not db/seed) so every environment gets the same topics and words.
--- Description order: "dev seed data" < "zz aa vocabulary" < "zz content vi" < "zz templates", so this runs after the
--- dev seed that still creates the old rows, and before the Vietnamese texts and the generated questions.
---
 -- Tree: 11 root topics, sub-topics under ANIMALS, VEHICLES and MATH. Choosing a root plays its whole subtree.
 -- Old topics and old answer items are DEACTIVATED, never deleted (sessions and questions still point at them).
 -- Items carry metadata.age_group: AGE_4_5 items are only asked in the 4-5 age group (see R__zz_templates.sql).
 -- metadata.learn_english = false marks words that are not taught in English (kept for Vietnamese mode).
--- CALCULATE and COUNTING have no answer items yet, so they stay hidden until they have questions.
+-- CALCULATE and COUNTING have no answer items yet, so they stay hidden until they have questions (CALCULATE: V17).
+-- Idempotent on purpose (ON CONFLICT / IS DISTINCT FROM), so it is safe on a database that already holds these rows.
 
 -- 1. Topics ----------------------------------------------------------------------------------------------------------
 INSERT INTO topics (code, name, name_vi, slug, description, description_vi, min_age, max_age, display_order, is_active)

@@ -2,7 +2,11 @@
 --   picture        : the expression column, drawn as text ("3 - 1 = ?") through game_questions.metadata.question_image
 --   correct answer : the result column, an answer item of category 'calculate' (value = the result)
 --   wrong answers  : other results of the same size group (calculate_basic 0-10, calculate_tens 20-100)
--- REPEATABLE and idempotent. Name order: runs after "zz templates" (it needs the GUESS mode and the topics).
+-- Needs the topics of V16. The GUESS game mode is created here if it is missing (same fixed id as the dev seed).
+
+INSERT INTO game_modes (id, code, name, description) VALUES
+    ('b0000000-0000-4000-8000-000000000001', 'GUESS', 'Guess', 'Look, listen and pick the right answer')
+ON CONFLICT DO NOTHING;
 
 INSERT INTO question_templates (code, kind, question_type, age_group, difficulty, i18n, generation, is_active) VALUES
     ('CALC_ADD', 'TEMPLATE', 'SIMPLE_ADDITION', 'AGE_4_5', 2,

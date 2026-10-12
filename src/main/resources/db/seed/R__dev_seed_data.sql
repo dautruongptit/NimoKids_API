@@ -49,9 +49,7 @@ INSERT INTO topics (code, name, slug, description, min_age, max_age, display_ord
     ('FAMILY', 'Family', 'family', 'People who love you', 1, 5, 18),
     ('MUSIC_INSTRUMENTS', 'Music & Instruments', 'music-instruments', 'Sounds and rhythms', 2, 5, 19),
     ('DAILY_ACTIVITIES', 'Daily Activities', 'daily-activities', 'Things we do every day', 1, 5, 20)
-ON CONFLICT (code) DO UPDATE
-    SET name = EXCLUDED.name, slug = EXCLUDED.slug, description = EXCLUDED.description, min_age = EXCLUDED.min_age,
-        max_age = EXCLUDED.max_age, display_order = EXCLUDED.display_order;
+ON CONFLICT (code) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- Answer items: the vocabulary of every group. Tags are EXPLICIT positive facts:
@@ -298,7 +296,7 @@ INSERT INTO answer_items (code, name, metadata) VALUES
     ('DAILY_WASHING_HANDS', 'Washing Hands', '{"category":"daily_activities","emoji":"🧼","features":["in_bathroom","uses_water","uses_soap"]}'),
     ('DAILY_SINGING', 'Singing', '{"category":"daily_activities","emoji":"🎤","features":["is_fun"]}'),
     ('DAILY_COOKING', 'Cooking', '{"category":"daily_activities","emoji":"🍳","features":["in_kitchen"]}')
-ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, metadata = EXCLUDED.metadata;
+ON CONFLICT (code) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- Questions: 10 per topic. Each has ONE correct answer item, the pool of wrong answers (same category, 3 items) and
@@ -650,6 +648,29 @@ WHERE q.correct_answer_item_id IN (SELECT id FROM answer_items WHERE code LIKE '
 DELETE FROM answer_items a
 WHERE a.code LIKE 'LEGACY\_%'
   AND NOT EXISTS (SELECT 1 FROM game_questions q WHERE q.correct_answer_item_id = a.id);
+
+-- ---------------------------------------------------------------------------
+-- Vocabulary v2 (V16) owns the topic tree and the words: the rows above are only the OLD sample set. On a fresh
+-- database V16 runs before this file, so the old topics and words that V16 does not know are switched off here.
+-- v2 answer items all carry metadata.age_group; the old ones do not.
+-- ---------------------------------------------------------------------------
+-- The hand-written (CURATED) questions above are not used any more (short template questions only). The upsert above
+-- switches them on again, so they are switched off here, not only in R__zz_templates.sql (which runs only when it changes).
+UPDATE game_questions
+SET is_active = FALSE, updated_at = now()
+WHERE is_active
+  AND (template_id IS NULL
+       OR template_id IN (SELECT id FROM question_templates WHERE kind <> 'TEMPLATE'));
+
+UPDATE topics
+SET is_active = FALSE, updated_at = now()
+WHERE is_active
+  AND code IN ('ALPHABET', 'FOOD', 'CLOTHES', 'HOME', 'NATURE', 'FARM_ANIMALS', 'WEATHER', 'FAMILY',
+               'MUSIC_INSTRUMENTS', 'DAILY_ACTIVITIES');
+
+UPDATE answer_items
+SET is_active = FALSE, updated_at = now()
+WHERE is_active AND NOT (metadata ? 'age_group');
 
 -- ---------------------------------------------------------------------------
 -- Stickers. FIRST_GAME and PERFECT_SCORE are awarded by rules in the service.

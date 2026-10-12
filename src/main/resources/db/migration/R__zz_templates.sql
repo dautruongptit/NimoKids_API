@@ -9,6 +9,9 @@
 -- Source of the wording: Question_Bank_review.md (Q01-Q40) and Rules_Creat_question.md. Only templates that can be
 -- generated with TODAY's data are active (is_active = TRUE); the others are stored as PLANNED with the reason.
 -- Texts: en and vi are used by LanguageResolverService; ja, zh and ko are kept for later.
+--
+-- The generated questions depend on the words of V16 (topics, items, tags) and V17/V18. Change this file whenever those
+-- tags change so the questions are generated again (a repeatable migration only re-runs when its own text changes).
 
 -- 1. The 40 templates ---------------------------------------------------------------------------------------------
 INSERT INTO question_templates (code, kind, question_type, age_group, difficulty, i18n, generation, is_active)

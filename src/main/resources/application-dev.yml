@@ -13,6 +13,9 @@ spring:
   flyway:
     # db/seed holds DEVELOPMENT sample data (well-known passwords). Never add it to a non-dev profile.
     locations: classpath:db/migration,classpath:db/seed
+    # Local databases that applied the short-lived R__zz_aa_vocabulary / R__zz_zz_calculate (now V16 / V17) still list
+    # them in the history table; tolerate applied-but-missing migrations (same setting as prod).
+    ignore-migration-patterns: "*:missing"
 
 # DEV ONLY secret (Base64, >= 256 bit). Override with JWT_SECRET outside local development.
 app:
