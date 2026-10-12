@@ -34,4 +34,9 @@ logging:
   level:
     root: INFO
     com.nimokids: DEBUG
+    # Every SQL statement with the VALUE of each bound parameter (dev only: values can contain player / session ids).
     org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    # Flyway: every migration statement it runs ("Executing SQL: ...") and the database NOTICE messages.
+    org.flywaydb.core.internal.sqlscript: DEBUG
+    org.flywaydb.core.internal.command: DEBUG

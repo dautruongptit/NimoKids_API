@@ -33,12 +33,12 @@ public class AuthCleanupJob {
             sessionService.cleanup();
             purgeAttempts();
         } catch (RuntimeException ex) {
-            log.warn("Auth cleanup failed: {}", ex.getClass().getSimpleName());
+            // The message says WHY (the class name alone hid a missing transaction for a long time).
+            log.warn("Auth cleanup failed: {}: {}", ex.getClass().getSimpleName(), ex.getMessage());
         }
     }
 
-    @org.springframework.transaction.annotation.Transactional
-    void purgeAttempts() {
+    private void purgeAttempts() {
         attempts.deleteExpiredBefore(clock.instant().minus(java.time.Duration.ofDays(1)));
     }
 
@@ -53,7 +53,7 @@ public class AuthCleanupJob {
                 }
             }, LOGIN_HISTORY_DAYS, SECURITY_EVENT_DAYS, AUDIT_EVENT_DAYS, IP_GENERALISE_AFTER_DAYS);
         } catch (RuntimeException ex) {
-            log.warn("Auth retention failed: {}", ex.getClass().getSimpleName());
+            log.warn("Auth retention failed: {}: {}", ex.getClass().getSimpleName(), ex.getMessage());
         }
     }
 }

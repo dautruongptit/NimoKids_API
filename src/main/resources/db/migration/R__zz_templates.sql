@@ -13,7 +13,7 @@
 -- The generated questions depend on the words of V16 (topics, items, tags) and V17/V18. Change this file whenever those
 -- tags change so the questions are generated again (a repeatable migration only re-runs when its own text changes).
 
--- 1. The 40 templates ---------------------------------------------------------------------------------------------
+-- 1. The templates (21 unused ones were deleted by V23) ---------------------------------------------------------------------------------------------
 INSERT INTO question_templates (code, kind, question_type, age_group, difficulty, i18n, generation, is_active)
 VALUES
     ('WHAT_IS_THIS', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "What is this?"}, "vi": {"text": "Đây là gì?"}, "ja": {"text": "これは何ですか？"}, "zh": {"text": "这是什么？"}, "ko": {"text": "이게 뭐예요?"}}', '{"bank_key": "Q01", "status": "ACTIVE", "target": "item", "topics": ["LAND_ANIMALS", "SEA_ANIMALS", "FLY_ANIMALS", "LAND_VEHICLES", "SEA_VEHICLES", "FLY_VEHICLES", "FRUITS", "VEGETABLES", "OBJECTS", "BODY_PARTS", "TOYS"], "distractors": {"from": "category", "count": 3}}', TRUE),
@@ -28,33 +28,12 @@ VALUES
     ('WHERE_IS_IT', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_1_3', 1, '{"en": {"text": "Where is it?"}, "vi": {"text": "Nó ở đâu?"}, "ja": {"text": "どこにありますか？"}, "zh": {"text": "它在哪里？"}, "ko": {"text": "어디에 있어요?"}}', '{"bank_key": "Q10", "status": "PLANNED", "reason": "needs scene pictures"}', FALSE),
     ('WHICH_ONE', 'TEMPLATE', 'WORD_TO_IMAGE', 'AGE_1_3', 1, '{"en": {"text": "Which one is it?"}, "vi": {"text": "Đó là cái nào?"}, "ja": {"text": "どれですか？"}, "zh": {"text": "是哪一个？"}, "ko": {"text": "어느 것이에요?"}}', '{"bank_key": "Q11", "status": "PLANNED", "reason": "needs the picture-answer mode (options are pictures)"}', FALSE),
     ('WHAT_DO_YOU_SEE', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "What do you see?"}, "vi": {"text": "Con nhìn thấy gì?"}, "ja": {"text": "何が見えますか？"}, "zh": {"text": "你看到了什么？"}}', '{"bank_key": "Q12", "status": "ACTIVE", "target": "item", "topics": ["LAND_ANIMALS", "SEA_ANIMALS", "FLY_ANIMALS", "LAND_VEHICLES", "SEA_VEHICLES", "FLY_VEHICLES", "FRUITS", "VEGETABLES", "OBJECTS", "BODY_PARTS", "TOYS"], "distractors": {"from": "category", "count": 3}}', TRUE),
-    ('BIG_OR_SMALL', 'TEMPLATE', 'COMPARISON', 'AGE_1_3', 1, '{"en": {"text": "Is it big or small?"}, "vi": {"text": "Nó to hay nhỏ?"}, "ja": {"text": "大きいですか、小さいですか？"}, "zh": {"text": "它是大还是小？"}, "ko": {"text": "커요, 작아요?"}}', '{"bank_key": "Q13", "status": "PLANNED", "reason": "has 2 options, the rules require 4: needs an owner decision"}', FALSE),
-    ('RED_OR_BLUE', 'TEMPLATE', 'COLOR_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "Is it red or blue?"}, "vi": {"text": "Nó màu đỏ hay xanh?"}, "ja": {"text": "赤ですか、青ですか？"}, "zh": {"text": "它是红色还是蓝色？"}}', '{"bank_key": "Q14", "status": "PLANNED", "reason": "has 2 options, the rules require 4: needs an owner decision"}', FALSE),
-    ('ONE_OR_TWO', 'TEMPLATE', 'COUNTING', 'AGE_1_3', 1, '{"en": {"text": "Is it one or two?"}, "vi": {"text": "Là một hay hai?"}, "ja": {"text": "一つですか、二つですか？"}, "zh": {"text": "是一个还是两个？"}}', '{"bank_key": "Q15", "status": "PLANNED", "reason": "has 2 options, the rules require 4: needs an owner decision"}', FALSE),
     ('WHICH_BIGGER', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which one is bigger?"}, "vi": {"text": "Cái nào lớn hơn?"}, "ja": {"text": "どちらが大きいですか？"}, "zh": {"text": "哪个更大？"}}', '{"bank_key": "Q16", "status": "PLANNED", "reason": "AGE_4_5: needs size data"}', FALSE),
     ('WHICH_SMALLER', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which one is smaller?"}, "vi": {"text": "Cái nào nhỏ hơn?"}, "ja": {"text": "どちらが小さいですか？"}, "zh": {"text": "哪个更小？"}}', '{"bank_key": "Q17", "status": "PLANNED", "reason": "AGE_4_5: needs size data"}', FALSE),
     ('WHICH_MORE', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which one has more?"}, "vi": {"text": "Cái nào có nhiều hơn?"}, "ja": {"text": "どちらが多いですか？"}, "zh": {"text": "哪个更多？"}}', '{"bank_key": "Q18", "status": "PLANNED", "reason": "AGE_4_5: needs the counting generator"}', FALSE),
     ('WHICH_FEWER', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which one has fewer?"}, "vi": {"text": "Cái nào có ít hơn?"}, "ja": {"text": "どちらが少ないですか？"}, "zh": {"text": "哪个更少？"}}', '{"bank_key": "Q19", "status": "PLANNED", "reason": "AGE_4_5: needs the counting generator"}', FALSE),
-    ('WHICH_DIFFERENT', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which one is different?"}, "vi": {"text": "Cái nào khác?"}, "ja": {"text": "どれが違いますか？"}, "zh": {"text": "哪个不一样？"}}', '{"bank_key": "Q20", "status": "PLANNED", "reason": "AGE_4_5: needs a generator"}', FALSE),
-    ('WHICH_SAME', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which ones are the same?"}, "vi": {"text": "Những cái nào giống nhau?"}, "ja": {"text": "どれが同じですか？"}, "zh": {"text": "哪些是一样的？"}}', '{"bank_key": "Q21", "status": "PLANNED", "reason": "AGE_4_5: needs a generator"}', FALSE),
-    ('WHAT_COMES_NEXT', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "What comes next?"}, "vi": {"text": "Tiếp theo là gì?"}, "ja": {"text": "次は何ですか？"}, "zh": {"text": "接下来是什么？"}}', '{"bank_key": "Q22", "status": "PLANNED", "reason": "AGE_4_5: needs ordered items"}', FALSE),
-    ('WHAT_COMES_BEFORE', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "What comes before it?"}, "vi": {"text": "Trước nó là gì?"}, "ja": {"text": "その前は何ですか？"}, "zh": {"text": "它前面是什么？"}}', '{"bank_key": "Q23", "status": "PLANNED", "reason": "AGE_4_5: needs ordered items"}', FALSE),
-    ('WHAT_COMES_AFTER', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "What comes after it?"}, "vi": {"text": "Sau nó là gì?"}, "ja": {"text": "その後は何ですか？"}, "zh": {"text": "它后面是什么？"}}', '{"bank_key": "Q24", "status": "PLANNED", "reason": "AGE_4_5: needs ordered items"}', FALSE),
-    ('WHO_HAS_THIS', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_4_5', 2, '{"en": {"text": "Who has this?"}, "vi": {"text": "Ai có cái này?"}, "ja": {"text": "これを持っているのは誰ですか？"}, "zh": {"text": "谁拥有这个？"}}', '{"bank_key": "Q25", "status": "PLANNED", "reason": "AGE_4_5: needs relation tags"}', FALSE),
-    ('WHO_USES_THIS', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_4_5', 2, '{"en": {"text": "Who uses this?"}, "vi": {"text": "Ai sử dụng cái này?"}, "ja": {"text": "これは誰が使いますか？"}, "zh": {"text": "谁使用这个？"}}', '{"bank_key": "Q26", "status": "PLANNED", "reason": "AGE_4_5: needs relation tags"}', FALSE),
-    ('WHAT_FOR', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_4_5', 2, '{"en": {"text": "What do we use it for?"}, "vi": {"text": "Chúng ta dùng nó để làm gì?"}, "ja": {"text": "これは何に使いますか？"}, "zh": {"text": "这个是用来做什么的？"}}', '{"bank_key": "Q27", "status": "PLANNED", "reason": "AGE_4_5: needs the used_for tag"}', FALSE),
-    ('WHERE_BELONGS', 'TEMPLATE', 'ATTRIBUTE_MATCHING', 'AGE_4_5', 2, '{"en": {"text": "Where does it belong?"}, "vi": {"text": "Nó thuộc về đâu?"}, "ja": {"text": "これはどこにありますか？"}, "zh": {"text": "它应该放在哪里？"}}', '{"bank_key": "Q28", "status": "PLANNED", "reason": "AGE_4_5: needs the belongs_to tag"}', FALSE),
-    ('GROUP_MORE', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which group has more?"}, "vi": {"text": "Nhóm nào có nhiều hơn?"}, "ja": {"text": "どちらのグループが多いですか？"}, "zh": {"text": "哪一组更多？"}}', '{"bank_key": "Q29", "status": "PLANNED", "reason": "AGE_4_5: needs the counting generator"}', FALSE),
-    ('GROUP_FEWER', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which group has fewer?"}, "vi": {"text": "Nhóm nào có ít hơn?"}, "ja": {"text": "どちらのグループが少ないですか？"}, "zh": {"text": "哪一组更少？"}}', '{"bank_key": "Q30", "status": "PLANNED", "reason": "AGE_4_5: needs the counting generator"}', FALSE),
-    ('AFTER_NUMBER_3', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "What comes after 3?"}, "vi": {"text": "Sau số 3 là số mấy?"}, "ja": {"text": "3の次は何ですか？"}, "zh": {"text": "3后面是几？"}}', '{"bank_key": "Q31", "status": "ACTIVE", "target": "fixed"}', TRUE),
-    ('BEFORE_NUMBER_5', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "What comes before 5?"}, "vi": {"text": "Trước số 5 là số mấy?"}, "ja": {"text": "5の前は何ですか？"}, "zh": {"text": "5前面是几？"}}', '{"bank_key": "Q32", "status": "ACTIVE", "target": "fixed"}', TRUE),
     ('NUMBER_BIGGER', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which number is bigger?"}, "vi": {"text": "Số nào lớn hơn?"}, "ja": {"text": "どの数字が大きいですか？"}, "zh": {"text": "哪个数字更大？"}}', '{"bank_key": "Q33", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
     ('NUMBER_SMALLER', 'TEMPLATE', 'COMPARISON', 'AGE_4_5', 2, '{"en": {"text": "Which number is smaller?"}, "vi": {"text": "Số nào nhỏ hơn?"}, "ja": {"text": "どの数字が小さいですか？"}, "zh": {"text": "哪个数字更小？"}}', '{"bank_key": "Q34", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
-    ('PLUS_1_1', 'TEMPLATE', 'SIMPLE_ADDITION', 'AGE_4_5', 2, '{"en": {"text": "What is 1 plus 1?"}, "vi": {"text": "1 cộng 1 bằng mấy?"}, "ja": {"text": "1たす1はいくつですか？"}, "zh": {"text": "1加1等于几？"}}', '{"bank_key": "Q35", "status": "ACTIVE", "target": "fixed"}', TRUE),
-    ('PLUS_2_1', 'TEMPLATE', 'SIMPLE_ADDITION', 'AGE_4_5', 2, '{"en": {"text": "What is 2 plus 1?"}, "vi": {"text": "2 cộng 1 bằng mấy?"}, "ja": {"text": "2たす1はいくつですか？"}, "zh": {"text": "2加1等于几？"}}', '{"bank_key": "Q36", "status": "ACTIVE", "target": "fixed"}', TRUE),
-    ('PLUS_3_1', 'TEMPLATE', 'SIMPLE_ADDITION', 'AGE_4_5', 2, '{"en": {"text": "What is 3 plus 1?"}, "vi": {"text": "3 cộng 1 bằng mấy?"}, "ja": {"text": "3たす1はいくつですか？"}, "zh": {"text": "3加1等于几？"}}', '{"bank_key": "Q37", "status": "ACTIVE", "target": "fixed"}', TRUE),
-    ('MINUS_3_1', 'TEMPLATE', 'SIMPLE_SUBTRACTION', 'AGE_4_5', 2, '{"en": {"text": "What is 3 minus 1?"}, "vi": {"text": "3 trừ 1 bằng mấy?"}, "ja": {"text": "3ひく1はいくつですか？"}, "zh": {"text": "3减1等于几？"}}', '{"bank_key": "Q38", "status": "ACTIVE", "target": "fixed"}', TRUE),
-    ('MINUS_4_1', 'TEMPLATE', 'SIMPLE_SUBTRACTION', 'AGE_4_5', 2, '{"en": {"text": "What is 4 minus 1?"}, "vi": {"text": "4 trừ 1 bằng mấy?"}, "ja": {"text": "4ひく1はいくつですか？"}, "zh": {"text": "4减1等于几？"}}', '{"bank_key": "Q39", "status": "ACTIVE", "target": "fixed"}', TRUE),
     ('MISSING_NUMBER', 'TEMPLATE', 'SEQUENCE', 'AGE_4_5', 2, '{"en": {"text": "Which number is missing?"}, "vi": {"text": "Số nào còn thiếu?"}, "ja": {"text": "どの数字が足りませんか？"}, "zh": {"text": "缺少哪个数字？"}}', '{"bank_key": "Q40", "status": "PLANNED", "reason": "AGE_4_5: needs the math generator"}', FALSE),
     ('WHAT_LETTER', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "What letter is this?"}, "vi": {"text": "Đây là chữ gì?"}}', '{"bank_key": "EXT-01", "status": "ACTIVE", "target": "item", "topics": ["ALPHABET"], "distractors": {"from": "category", "count": 3}}', TRUE)
 ON CONFLICT (code) DO UPDATE
@@ -176,7 +155,7 @@ ON CONFLICT (id) DO UPDATE
         question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty,
         is_active = TRUE, updated_at = now();
 
--- 3c. Attribute and fixed questions ---------------------------------------------------------------------------------
+-- 3c. Attribute questions --------------------------------------------------------------------------------------
 --     WHO_CAN_FLY / WHO_CAN_SWIM: one question per animal that has the tag (V22), under ANIMALS. The wrong answers are
 --     animals explicitly tagged false for the same ability. The picture is a neutral scene: the answer's own picture
 --     would show the right answer (metadata.question_image replaces it).
@@ -199,38 +178,6 @@ JOIN game_modes m ON m.code = 'GUESS'
 JOIN answer_items i ON i.is_active AND (i.metadata -> 'animal') = 'true'::jsonb
                    AND (i.metadata -> (tpl.generation ->> 'tag')) = 'true'::jsonb
 WHERE tpl.kind = 'TEMPLATE' AND tpl.is_active AND tpl.generation ->> 'target' = 'attribute'
-ON CONFLICT (id) DO UPDATE
-    SET question_text = EXCLUDED.question_text, metadata = EXCLUDED.metadata, template_id = EXCLUDED.template_id,
-        correct_answer_item_id = EXCLUDED.correct_answer_item_id, question_type = EXCLUDED.question_type,
-        age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty, is_active = TRUE, updated_at = now();
-
---     Fixed questions of the math templates: one question each, the numbers are in the wording. The picture shows the
---     numbers of the question, never the answer.
-INSERT INTO game_questions
-    (id, topic_id, game_mode_id, question_text, correct_answer_item_id, difficulty, min_age, max_age, display_order,
-     metadata, is_active, question_key, age_group, question_type, template_id)
-SELECT md5('nimokids:template-question:' || f.tpl_code)::uuid,
-       t.id, m.id, tpl.i18n #>> '{en,text}', i.id, tpl.difficulty, 4, 5, 500 + f.n,
-       jsonb_build_object(
-           'question_image', f.picture,
-           'distractor_rules', jsonb_build_array(jsonb_build_object(
-               'match', jsonb_build_object('category', i.metadata ->> 'category'), 'count', 3)),
-           'correct_match', jsonb_build_object('item', i.code),
-           'source', 'TEMPLATE'),
-       TRUE, 'TPL_' || f.tpl_code, tpl.age_group, tpl.question_type, tpl.id
-FROM (VALUES
-    (1, 'AFTER_NUMBER_3', 'NUMBERS', 'NUMBERS_FOUR', '3 → ?'),
-    (2, 'BEFORE_NUMBER_5', 'NUMBERS', 'NUMBERS_FOUR', '? → 5'),
-    (3, 'PLUS_1_1', 'CALCULATE', 'CALCULATE_2', '1 + 1 = ?'),
-    (4, 'PLUS_2_1', 'CALCULATE', 'CALCULATE_3', '2 + 1 = ?'),
-    (5, 'PLUS_3_1', 'CALCULATE', 'CALCULATE_4', '3 + 1 = ?'),
-    (6, 'MINUS_3_1', 'CALCULATE', 'CALCULATE_2', '3 − 1 = ?'),
-    (7, 'MINUS_4_1', 'CALCULATE', 'CALCULATE_3', '4 − 1 = ?')
-) AS f(n, tpl_code, topic_code, item_code, picture)
-JOIN question_templates tpl ON tpl.code = f.tpl_code AND tpl.is_active
-JOIN topics t ON t.code = f.topic_code AND t.is_active
-JOIN answer_items i ON i.code = f.item_code AND i.is_active
-JOIN game_modes m ON m.code = 'GUESS'
 ON CONFLICT (id) DO UPDATE
     SET question_text = EXCLUDED.question_text, metadata = EXCLUDED.metadata, template_id = EXCLUDED.template_id,
         correct_answer_item_id = EXCLUDED.correct_answer_item_id, question_type = EXCLUDED.question_type,
