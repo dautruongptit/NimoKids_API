@@ -54,6 +54,10 @@ public record QuestionSnapshot(
         Object emoji = dynamic == null && correct != null && correct.getMetadata() != null
                 ? correct.getMetadata().get("emoji") : null;
         Map<String, Object> metadata = question.getMetadata() != null ? question.getMetadata() : Map.of();
+        // A question may carry its own picture (CALCULATE draws the expression); it replaces the answer's picture.
+        if (dynamic == null && metadata.get("question_image") instanceof String own && !own.isBlank()) {
+            emoji = own;
+        }
         Map<String, Object> generation = new java.util.LinkedHashMap<>();
         if (metadata.get("distractor_rules") != null) {
             generation.put("distractor_rules", metadata.get("distractor_rules"));

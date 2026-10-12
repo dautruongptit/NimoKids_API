@@ -1,0 +1,165 @@
+-- CALCULATE (MATH sub-topic): "What is the result?". Source: sheet CALCULATE of NimoKids_Vocabulary_Clean_v2.xlsx.
+--   picture        : the expression column, drawn as text ("3 - 1 = ?") through game_questions.metadata.question_image
+--   correct answer : the result column, an answer item of category 'calculate' (value = the result)
+--   wrong answers  : other results of the same size group (calculate_basic 0-10, calculate_tens 20-100)
+-- REPEATABLE and idempotent. Name order: runs after "zz templates" (it needs the GUESS mode and the topics).
+
+INSERT INTO question_templates (code, kind, question_type, age_group, difficulty, i18n, generation, is_active) VALUES
+    ('CALC_ADD', 'TEMPLATE', 'SIMPLE_ADDITION', 'AGE_4_5', 2,
+     '{"en": {"text": "What is the result?"}, "vi": {"text": "Kết quả là bao nhiêu?"}}',
+     '{"status": "ACTIVE", "source": "CALCULATE_SHEET"}', TRUE),
+    ('CALC_SUB', 'TEMPLATE', 'SIMPLE_SUBTRACTION', 'AGE_4_5', 2,
+     '{"en": {"text": "What is the result?"}, "vi": {"text": "Kết quả là bao nhiêu?"}}',
+     '{"status": "ACTIVE", "source": "CALCULATE_SHEET"}', TRUE)
+ON CONFLICT (code) DO UPDATE
+    SET question_type = EXCLUDED.question_type, age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty,
+        i18n = EXCLUDED.i18n, generation = EXCLUDED.generation, is_active = EXCLUDED.is_active, updated_at = now()
+    WHERE question_templates.kind = 'TEMPLATE';
+
+-- Result items: one per distinct result in the sheet.
+INSERT INTO answer_items (code, name, metadata, i18n, is_active) VALUES
+    ('CALCULATE_0', '0', '{"category": "calculate_basic", "emoji": "0", "features": [], "age_group": "AGE_4_5", "value": 0, "item": "CALCULATE_0"}'::jsonb, '{"en": {"text": "0"}, "vi": {"text": "0"}}'::jsonb, TRUE),
+    ('CALCULATE_1', '1', '{"category": "calculate_basic", "emoji": "1", "features": [], "age_group": "AGE_4_5", "value": 1, "item": "CALCULATE_1"}'::jsonb, '{"en": {"text": "1"}, "vi": {"text": "1"}}'::jsonb, TRUE),
+    ('CALCULATE_2', '2', '{"category": "calculate_basic", "emoji": "2", "features": [], "age_group": "AGE_4_5", "value": 2, "item": "CALCULATE_2"}'::jsonb, '{"en": {"text": "2"}, "vi": {"text": "2"}}'::jsonb, TRUE),
+    ('CALCULATE_3', '3', '{"category": "calculate_basic", "emoji": "3", "features": [], "age_group": "AGE_4_5", "value": 3, "item": "CALCULATE_3"}'::jsonb, '{"en": {"text": "3"}, "vi": {"text": "3"}}'::jsonb, TRUE),
+    ('CALCULATE_4', '4', '{"category": "calculate_basic", "emoji": "4", "features": [], "age_group": "AGE_4_5", "value": 4, "item": "CALCULATE_4"}'::jsonb, '{"en": {"text": "4"}, "vi": {"text": "4"}}'::jsonb, TRUE),
+    ('CALCULATE_5', '5', '{"category": "calculate_basic", "emoji": "5", "features": [], "age_group": "AGE_4_5", "value": 5, "item": "CALCULATE_5"}'::jsonb, '{"en": {"text": "5"}, "vi": {"text": "5"}}'::jsonb, TRUE),
+    ('CALCULATE_6', '6', '{"category": "calculate_basic", "emoji": "6", "features": [], "age_group": "AGE_4_5", "value": 6, "item": "CALCULATE_6"}'::jsonb, '{"en": {"text": "6"}, "vi": {"text": "6"}}'::jsonb, TRUE),
+    ('CALCULATE_7', '7', '{"category": "calculate_basic", "emoji": "7", "features": [], "age_group": "AGE_4_5", "value": 7, "item": "CALCULATE_7"}'::jsonb, '{"en": {"text": "7"}, "vi": {"text": "7"}}'::jsonb, TRUE),
+    ('CALCULATE_8', '8', '{"category": "calculate_basic", "emoji": "8", "features": [], "age_group": "AGE_4_5", "value": 8, "item": "CALCULATE_8"}'::jsonb, '{"en": {"text": "8"}, "vi": {"text": "8"}}'::jsonb, TRUE),
+    ('CALCULATE_9', '9', '{"category": "calculate_basic", "emoji": "9", "features": [], "age_group": "AGE_4_5", "value": 9, "item": "CALCULATE_9"}'::jsonb, '{"en": {"text": "9"}, "vi": {"text": "9"}}'::jsonb, TRUE),
+    ('CALCULATE_10', '10', '{"category": "calculate_basic", "emoji": "10", "features": [], "age_group": "AGE_4_5", "value": 10, "item": "CALCULATE_10"}'::jsonb, '{"en": {"text": "10"}, "vi": {"text": "10"}}'::jsonb, TRUE),
+    ('CALCULATE_20', '20', '{"category": "calculate_tens", "emoji": "20", "features": [], "age_group": "AGE_4_5", "value": 20, "item": "CALCULATE_20"}'::jsonb, '{"en": {"text": "20"}, "vi": {"text": "20"}}'::jsonb, TRUE),
+    ('CALCULATE_30', '30', '{"category": "calculate_tens", "emoji": "30", "features": [], "age_group": "AGE_4_5", "value": 30, "item": "CALCULATE_30"}'::jsonb, '{"en": {"text": "30"}, "vi": {"text": "30"}}'::jsonb, TRUE),
+    ('CALCULATE_40', '40', '{"category": "calculate_tens", "emoji": "40", "features": [], "age_group": "AGE_4_5", "value": 40, "item": "CALCULATE_40"}'::jsonb, '{"en": {"text": "40"}, "vi": {"text": "40"}}'::jsonb, TRUE),
+    ('CALCULATE_50', '50', '{"category": "calculate_tens", "emoji": "50", "features": [], "age_group": "AGE_4_5", "value": 50, "item": "CALCULATE_50"}'::jsonb, '{"en": {"text": "50"}, "vi": {"text": "50"}}'::jsonb, TRUE),
+    ('CALCULATE_60', '60', '{"category": "calculate_tens", "emoji": "60", "features": [], "age_group": "AGE_4_5", "value": 60, "item": "CALCULATE_60"}'::jsonb, '{"en": {"text": "60"}, "vi": {"text": "60"}}'::jsonb, TRUE),
+    ('CALCULATE_70', '70', '{"category": "calculate_tens", "emoji": "70", "features": [], "age_group": "AGE_4_5", "value": 70, "item": "CALCULATE_70"}'::jsonb, '{"en": {"text": "70"}, "vi": {"text": "70"}}'::jsonb, TRUE),
+    ('CALCULATE_80', '80', '{"category": "calculate_tens", "emoji": "80", "features": [], "age_group": "AGE_4_5", "value": 80, "item": "CALCULATE_80"}'::jsonb, '{"en": {"text": "80"}, "vi": {"text": "80"}}'::jsonb, TRUE),
+    ('CALCULATE_90', '90', '{"category": "calculate_tens", "emoji": "90", "features": [], "age_group": "AGE_4_5", "value": 90, "item": "CALCULATE_90"}'::jsonb, '{"en": {"text": "90"}, "vi": {"text": "90"}}'::jsonb, TRUE),
+    ('CALCULATE_100', '100', '{"category": "calculate_tens", "emoji": "100", "features": [], "age_group": "AGE_4_5", "value": 100, "item": "CALCULATE_100"}'::jsonb, '{"en": {"text": "100"}, "vi": {"text": "100"}}'::jsonb, TRUE)
+ON CONFLICT (code) DO UPDATE
+    SET name = EXCLUDED.name, metadata = EXCLUDED.metadata, i18n = EXCLUDED.i18n, is_active = TRUE, updated_at = now();
+
+-- One question per expression.
+INSERT INTO game_questions
+    (id, topic_id, game_mode_id, question_text, correct_answer_item_id, difficulty, min_age, max_age, display_order,
+     metadata, is_active, question_key, age_group, question_type, template_id)
+SELECT md5('nimokids:calc-question:' || e.expr)::uuid,
+       t.id, m.id, tpl.i18n #>> '{en,text}', i.id, tpl.difficulty, 4, 5, 300 + e.n,
+       jsonb_build_object(
+           'question_image', e.shown,
+           'distractor_rules', jsonb_build_array(jsonb_build_object('match', jsonb_build_object('category', i.metadata ->> 'category'), 'count', 3)),
+           'correct_match', jsonb_build_object('item', i.code),
+           'source', 'TEMPLATE'),
+       TRUE, 'TPL_' || tpl.code || '_' || replace(e.expr, ' ', ''), 'AGE_4_5'::age_group, tpl.question_type, tpl.id
+FROM (VALUES
+    (1, '1 + 1', '1 + 1 = ?', 'CALC_ADD', 2),
+    (2, '1 + 2', '1 + 2 = ?', 'CALC_ADD', 3),
+    (3, '1 + 3', '1 + 3 = ?', 'CALC_ADD', 4),
+    (4, '1 + 4', '1 + 4 = ?', 'CALC_ADD', 5),
+    (5, '1 + 5', '1 + 5 = ?', 'CALC_ADD', 6),
+    (6, '2 + 1', '2 + 1 = ?', 'CALC_ADD', 3),
+    (7, '2 + 2', '2 + 2 = ?', 'CALC_ADD', 4),
+    (8, '2 + 3', '2 + 3 = ?', 'CALC_ADD', 5),
+    (9, '2 + 4', '2 + 4 = ?', 'CALC_ADD', 6),
+    (10, '2 + 5', '2 + 5 = ?', 'CALC_ADD', 7),
+    (11, '3 + 1', '3 + 1 = ?', 'CALC_ADD', 4),
+    (12, '3 + 2', '3 + 2 = ?', 'CALC_ADD', 5),
+    (13, '3 + 3', '3 + 3 = ?', 'CALC_ADD', 6),
+    (14, '3 + 4', '3 + 4 = ?', 'CALC_ADD', 7),
+    (15, '3 + 5', '3 + 5 = ?', 'CALC_ADD', 8),
+    (16, '4 + 1', '4 + 1 = ?', 'CALC_ADD', 5),
+    (17, '4 + 2', '4 + 2 = ?', 'CALC_ADD', 6),
+    (18, '4 + 3', '4 + 3 = ?', 'CALC_ADD', 7),
+    (19, '4 + 4', '4 + 4 = ?', 'CALC_ADD', 8),
+    (20, '4 + 5', '4 + 5 = ?', 'CALC_ADD', 9),
+    (21, '5 + 1', '5 + 1 = ?', 'CALC_ADD', 6),
+    (22, '5 + 2', '5 + 2 = ?', 'CALC_ADD', 7),
+    (23, '5 + 3', '5 + 3 = ?', 'CALC_ADD', 8),
+    (24, '5 + 4', '5 + 4 = ?', 'CALC_ADD', 9),
+    (25, '5 + 5', '5 + 5 = ?', 'CALC_ADD', 10),
+    (26, '2 - 1', '2 − 1 = ?', 'CALC_SUB', 1),
+    (27, '2 - 2', '2 − 2 = ?', 'CALC_SUB', 0),
+    (28, '3 - 1', '3 − 1 = ?', 'CALC_SUB', 2),
+    (29, '3 - 2', '3 − 2 = ?', 'CALC_SUB', 1),
+    (30, '3 - 3', '3 − 3 = ?', 'CALC_SUB', 0),
+    (31, '4 - 1', '4 − 1 = ?', 'CALC_SUB', 3),
+    (32, '4 - 2', '4 − 2 = ?', 'CALC_SUB', 2),
+    (33, '4 - 3', '4 − 3 = ?', 'CALC_SUB', 1),
+    (34, '4 - 4', '4 − 4 = ?', 'CALC_SUB', 0),
+    (35, '5 - 1', '5 − 1 = ?', 'CALC_SUB', 4),
+    (36, '5 - 2', '5 − 2 = ?', 'CALC_SUB', 3),
+    (37, '5 - 3', '5 − 3 = ?', 'CALC_SUB', 2),
+    (38, '5 - 4', '5 − 4 = ?', 'CALC_SUB', 1),
+    (39, '5 - 5', '5 − 5 = ?', 'CALC_SUB', 0),
+    (40, '6 - 1', '6 − 1 = ?', 'CALC_SUB', 5),
+    (41, '6 - 2', '6 − 2 = ?', 'CALC_SUB', 4),
+    (42, '6 - 3', '6 − 3 = ?', 'CALC_SUB', 3),
+    (43, '6 - 4', '6 − 4 = ?', 'CALC_SUB', 2),
+    (44, '6 - 5', '6 − 5 = ?', 'CALC_SUB', 1),
+    (45, '6 - 6', '6 − 6 = ?', 'CALC_SUB', 0),
+    (46, '7 - 1', '7 − 1 = ?', 'CALC_SUB', 6),
+    (47, '7 - 2', '7 − 2 = ?', 'CALC_SUB', 5),
+    (48, '7 - 3', '7 − 3 = ?', 'CALC_SUB', 4),
+    (49, '7 - 4', '7 − 4 = ?', 'CALC_SUB', 3),
+    (50, '7 - 5', '7 − 5 = ?', 'CALC_SUB', 2),
+    (51, '7 - 6', '7 − 6 = ?', 'CALC_SUB', 1),
+    (52, '7 - 7', '7 − 7 = ?', 'CALC_SUB', 0),
+    (53, '8 - 1', '8 − 1 = ?', 'CALC_SUB', 7),
+    (54, '8 - 2', '8 − 2 = ?', 'CALC_SUB', 6),
+    (55, '8 - 3', '8 − 3 = ?', 'CALC_SUB', 5),
+    (56, '8 - 4', '8 − 4 = ?', 'CALC_SUB', 4),
+    (57, '8 - 5', '8 − 5 = ?', 'CALC_SUB', 3),
+    (58, '8 - 6', '8 − 6 = ?', 'CALC_SUB', 2),
+    (59, '8 - 7', '8 − 7 = ?', 'CALC_SUB', 1),
+    (60, '8 - 8', '8 − 8 = ?', 'CALC_SUB', 0),
+    (61, '9 - 1', '9 − 1 = ?', 'CALC_SUB', 8),
+    (62, '9 - 2', '9 − 2 = ?', 'CALC_SUB', 7),
+    (63, '9 - 3', '9 − 3 = ?', 'CALC_SUB', 6),
+    (64, '9 - 4', '9 − 4 = ?', 'CALC_SUB', 5),
+    (65, '9 - 5', '9 − 5 = ?', 'CALC_SUB', 4),
+    (66, '9 - 6', '9 − 6 = ?', 'CALC_SUB', 3),
+    (67, '9 - 7', '9 − 7 = ?', 'CALC_SUB', 2),
+    (68, '9 - 8', '9 − 8 = ?', 'CALC_SUB', 1),
+    (69, '9 - 9', '9 − 9 = ?', 'CALC_SUB', 0),
+    (70, '10 - 1', '10 − 1 = ?', 'CALC_SUB', 9),
+    (71, '10 - 2', '10 − 2 = ?', 'CALC_SUB', 8),
+    (72, '10 - 3', '10 − 3 = ?', 'CALC_SUB', 7),
+    (73, '10 - 4', '10 − 4 = ?', 'CALC_SUB', 6),
+    (74, '10 - 5', '10 − 5 = ?', 'CALC_SUB', 5),
+    (75, '10 - 6', '10 − 6 = ?', 'CALC_SUB', 4),
+    (76, '10 - 7', '10 − 7 = ?', 'CALC_SUB', 3),
+    (77, '10 - 8', '10 − 8 = ?', 'CALC_SUB', 2),
+    (78, '10 - 9', '10 − 9 = ?', 'CALC_SUB', 1),
+    (79, '10 - 10', '10 − 10 = ?', 'CALC_SUB', 0),
+    (80, '10 + 10', '10 + 10 = ?', 'CALC_ADD', 20),
+    (81, '20 + 10', '20 + 10 = ?', 'CALC_ADD', 30),
+    (82, '20 + 20', '20 + 20 = ?', 'CALC_ADD', 40),
+    (83, '30 + 20', '30 + 20 = ?', 'CALC_ADD', 50),
+    (84, '30 + 30', '30 + 30 = ?', 'CALC_ADD', 60),
+    (85, '40 + 10', '40 + 10 = ?', 'CALC_ADD', 50),
+    (86, '40 + 20', '40 + 20 = ?', 'CALC_ADD', 60),
+    (87, '40 + 30', '40 + 30 = ?', 'CALC_ADD', 70),
+    (88, '40 + 40', '40 + 40 = ?', 'CALC_ADD', 80),
+    (89, '50 + 10', '50 + 10 = ?', 'CALC_ADD', 60),
+    (90, '50 + 20', '50 + 20 = ?', 'CALC_ADD', 70),
+    (91, '50 + 30', '50 + 30 = ?', 'CALC_ADD', 80),
+    (92, '50 + 40', '50 + 40 = ?', 'CALC_ADD', 90),
+    (93, '50 + 50', '50 + 50 = ?', 'CALC_ADD', 100),
+    (94, '20 - 10', '20 − 10 = ?', 'CALC_SUB', 10),
+    (95, '30 - 10', '30 − 10 = ?', 'CALC_SUB', 20),
+    (96, '30 - 20', '30 − 20 = ?', 'CALC_SUB', 10),
+    (97, '40 - 20', '40 − 20 = ?', 'CALC_SUB', 20),
+    (98, '50 - 10', '50 − 10 = ?', 'CALC_SUB', 40),
+    (99, '50 - 20', '50 − 20 = ?', 'CALC_SUB', 30),
+    (100, '50 - 50', '50 − 50 = ?', 'CALC_SUB', 0)
+) AS e(n, expr, shown, tpl_code, result)
+JOIN question_templates tpl ON tpl.code = e.tpl_code
+JOIN topics t ON t.code = 'CALCULATE' AND t.is_active
+JOIN answer_items i ON i.code = 'CALCULATE_' || e.result
+JOIN game_modes m ON m.code = 'GUESS'
+ON CONFLICT (id) DO UPDATE
+    SET question_text = EXCLUDED.question_text, metadata = EXCLUDED.metadata, template_id = EXCLUDED.template_id,
+        correct_answer_item_id = EXCLUDED.correct_answer_item_id, question_type = EXCLUDED.question_type,
+        age_group = EXCLUDED.age_group, difficulty = EXCLUDED.difficulty, is_active = TRUE, updated_at = now();

@@ -13,8 +13,8 @@
 -- 1. The 40 templates ---------------------------------------------------------------------------------------------
 INSERT INTO question_templates (code, kind, question_type, age_group, difficulty, i18n, generation, is_active)
 VALUES
-    ('WHAT_IS_THIS', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "What is this?"}, "vi": {"text": "Đây là gì?"}, "ja": {"text": "これは何ですか？"}, "zh": {"text": "这是什么？"}, "ko": {"text": "이게 뭐예요?"}}', '{"bank_key": "Q01", "status": "ACTIVE", "target": "item", "topics": ["ANIMALS", "FRUITS", "VEGETABLES", "VEHICLES", "TOYS", "CLOTHES", "HOME", "NATURE", "SEA_ANIMALS", "FARM_ANIMALS", "FOOD", "BODY_PARTS", "MUSIC_INSTRUMENTS", "WEATHER", "DAILY_ACTIVITIES"], "distractors": {"from": "category", "count": 3}}', TRUE),
-    ('WHO_IS_THIS', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "Who is this?"}, "vi": {"text": "Đây là ai?"}, "ja": {"text": "これは誰ですか？"}, "zh": {"text": "这是谁？"}, "ko": {"text": "누구예요?"}}', '{"bank_key": "Q02", "status": "ACTIVE", "target": "item", "topics": ["FAMILY"], "distractors": {"from": "category", "count": 3}}', TRUE),
+    ('WHAT_IS_THIS', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "What is this?"}, "vi": {"text": "Đây là gì?"}, "ja": {"text": "これは何ですか？"}, "zh": {"text": "这是什么？"}, "ko": {"text": "이게 뭐예요?"}}', '{"bank_key": "Q01", "status": "ACTIVE", "target": "item", "topics": ["LAND_ANIMALS", "SEA_ANIMALS", "FLY_ANIMALS", "LAND_VEHICLES", "SEA_VEHICLES", "FLY_VEHICLES", "FRUITS", "VEGETABLES", "OBJECTS", "BODY_PARTS", "TOYS"], "distractors": {"from": "category", "count": 3}}', TRUE),
+    ('WHO_IS_THIS', 'TEMPLATE', 'IMAGE_TO_WORD', 'AGE_1_3', 1, '{"en": {"text": "Who is this?"}, "vi": {"text": "Đây là ai?"}, "ja": {"text": "これは誰ですか？"}, "zh": {"text": "这是谁？"}, "ko": {"text": "누구예요?"}}', '{"bank_key": "Q02", "status": "ACTIVE", "target": "item", "topics": ["JOB", "PEOPLE_CHARACTERS"], "distractors": {"from": "category", "count": 3}}', TRUE),
     ('WHAT_COLOR', 'TEMPLATE', 'COLOR_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "What color is it?"}, "vi": {"text": "Nó có màu gì?"}, "ja": {"text": "何色ですか？"}, "zh": {"text": "它是什么颜色？"}, "ko": {"text": "무슨 색이에요?"}}', '{"bank_key": "Q03", "status": "ACTIVE", "target": "item", "topics": ["COLORS"], "distractors": {"from": "category", "count": 3}}', TRUE),
     ('WHAT_SHAPE', 'TEMPLATE', 'SHAPE_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "What shape is it?"}, "vi": {"text": "Nó có hình gì?"}, "ja": {"text": "何の形ですか？"}, "zh": {"text": "它是什么形状？"}, "ko": {"text": "무슨 모양이에요?"}}', '{"bank_key": "Q04", "status": "ACTIVE", "target": "item", "topics": ["SHAPES"], "distractors": {"from": "category", "count": 3}}', TRUE),
     ('WHAT_NUMBER', 'TEMPLATE', 'NUMBER_RECOGNITION', 'AGE_1_3', 1, '{"en": {"text": "What number is this?"}, "vi": {"text": "Đây là số mấy?"}, "ja": {"text": "これは何の数字ですか？"}, "zh": {"text": "这是几？"}}', '{"bank_key": "Q05", "status": "ACTIVE", "target": "item", "topics": ["NUMBERS"], "distractors": {"from": "category", "count": 3}}', TRUE),
@@ -109,8 +109,8 @@ WHERE code IN ('NUMBERS_ONE', 'NUMBERS_TWO', 'NUMBERS_THREE', 'NUMBERS_FOUR', 'N
 
 UPDATE answer_items
 SET metadata = metadata || '{"countable": true}'::jsonb
-WHERE code IN ('FRUITS_APPLE', 'FRUITS_BANANA', 'FRUITS_ORANGE', 'TOYS_BALL', 'FARM_ANIMALS_DUCK', 'SHAPES_STAR',
-               'ANIMALS_CAT', 'ANIMALS_DOG', 'VEHICLES_CAR')
+WHERE code IN ('FRUITS_APPLE', 'FRUITS_BANANA', 'FRUITS_ORANGE', 'TOYS_BALL', 'FLY_ANIMALS_DUCK', 'SHAPES_STAR',
+               'LAND_ANIMALS_CAT', 'LAND_ANIMALS_DOG', 'LAND_VEHICLES_CAR')
   AND (metadata -> 'countable') IS DISTINCT FROM 'true'::jsonb;
 
 -- 3. One question per (template, topic, answer item) --------------------------------------------------------------
@@ -127,7 +127,10 @@ SELECT md5('nimokids:template-question:' || tpl.code || ':' || i.code)::uuid,
                                  THEN jsonb_build_object('lookalike', i.metadata ->> 'lookalike')
                                  ELSE jsonb_build_object('item', i.code) END,
            'source', 'TEMPLATE'),
-       TRUE, 'TPL_' || tpl.code || '_' || i.code, tpl.age_group, tpl.question_type, tpl.id
+       TRUE, 'TPL_' || tpl.code || '_' || i.code,
+       -- A word that is only taught at 4-5 is only asked in the 4-5 group.
+       CASE WHEN i.metadata ->> 'age_group' = 'AGE_4_5' THEN 'AGE_4_5'::age_group ELSE tpl.age_group END,
+       tpl.question_type, tpl.id
 FROM question_templates tpl
 CROSS JOIN LATERAL jsonb_array_elements_text(tpl.generation -> 'topics') AS tc(code)
 JOIN topics t ON t.code = tc.code AND t.is_active

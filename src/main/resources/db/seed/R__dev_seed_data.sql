@@ -51,7 +51,7 @@ INSERT INTO topics (code, name, slug, description, min_age, max_age, display_ord
     ('DAILY_ACTIVITIES', 'Daily Activities', 'daily-activities', 'Things we do every day', 1, 5, 20)
 ON CONFLICT (code) DO UPDATE
     SET name = EXCLUDED.name, slug = EXCLUDED.slug, description = EXCLUDED.description, min_age = EXCLUDED.min_age,
-        max_age = EXCLUDED.max_age, display_order = EXCLUDED.display_order, parent_id = NULL, is_active = TRUE;
+        max_age = EXCLUDED.max_age, display_order = EXCLUDED.display_order;
 
 -- ---------------------------------------------------------------------------
 -- Answer items: the vocabulary of every group. Tags are EXPLICIT positive facts:
@@ -298,7 +298,7 @@ INSERT INTO answer_items (code, name, metadata) VALUES
     ('DAILY_WASHING_HANDS', 'Washing Hands', '{"category":"daily_activities","emoji":"🧼","features":["in_bathroom","uses_water","uses_soap"]}'),
     ('DAILY_SINGING', 'Singing', '{"category":"daily_activities","emoji":"🎤","features":["is_fun"]}'),
     ('DAILY_COOKING', 'Cooking', '{"category":"daily_activities","emoji":"🍳","features":["in_kitchen"]}')
-ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, metadata = EXCLUDED.metadata, is_active = TRUE;
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, metadata = EXCLUDED.metadata;
 
 -- ---------------------------------------------------------------------------
 -- Questions: 10 per topic. Each has ONE correct answer item, the pool of wrong answers (same category, 3 items) and
