@@ -23,11 +23,14 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /build/app.jar app.jar
+# Log directory (compose mounts a named volume here; a volume copies this owner, so the non-root user can write).
+RUN mkdir -p /app/logs && chown nimokids /app/logs
 USER nimokids
 
 # Port standard: project 85 -> API 8510. SERVER_PORT must be passed by the environment (compose does it) so the
 # container always listens on the allocated port; the value below is only a safe default.
 ENV SERVER_PORT=8510 \
+    LOG_DIR=/app/logs \
     SPRING_PROFILES_ACTIVE=prod \
     JAVA_OPTS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8510
