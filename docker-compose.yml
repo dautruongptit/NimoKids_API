@@ -2,12 +2,13 @@
 #
 # Run from this folder (the backend repo):
 #   cp .env.example .env        # fill in DB_USER, DB_PASSWORD, JWT_SECRET (and DB_HOST if not infra-postgres)
+#   mkdir -p logs && sudo chown 10001:10001 logs   # once: the API runs as uid 10001 and writes ./logs
 #   docker network create shared-db-network     # once, if it does not exist yet
 #   docker compose up -d --build                # API only
 #   docker compose --profile web up -d --build  # API + web (needs the website repo next to this one)
 #   docker compose ps                           # nimokids-api should become "healthy"
 #   docker compose logs -f nimokids-api          # console log
-#   docker compose exec nimokids-api tail -f /app/logs/nimokids-api.log   # file log (volume nimokids-api-logs)
+#   tail -f logs/nimokids-api.log                # file log, in this folder (bind mount ./logs -> /app/logs)
 #
 # Ports are transparent 1:1 and bound to 127.0.0.1 only (Cloudflare Tunnel / reverse proxy is the way in).
 # Networks:
@@ -48,12 +49,12 @@ services:
       REDIS_HOST: ${REDIS_HOST:-infra-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: "5"
-      # Rolling log files (daily, 20 MB, 14 days, 1 GB cap) go to the volume below.
+      # Rolling log files (daily, 20 MB, 14 days, 1 GB cap) go to ./logs next to this file (mounted below).
       LOG_DIR: /app/logs
     ports:
       - "127.0.0.1:8510:8510"
     volumes:
-      - nimokids-api-logs:/app/logs
+      - ./logs:/app/logs
     networks:
       - nimokids-net
       - shared-db-network
@@ -75,10 +76,6 @@ services:
         condition: service_healthy
     networks:
       - nimokids-net
-
-volumes:
-  nimokids-api-logs:
-    name: nimokids-api-logs
 
 networks:
   nimokids-net:

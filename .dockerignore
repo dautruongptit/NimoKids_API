@@ -5,6 +5,8 @@ target/
 .vscode/
 *.iml
 *.log
+*.log.gz
+logs/
 # secrets never go into an image
 .env
 .env.*

@@ -23,7 +23,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /build/app.jar app.jar
-# Log directory (compose mounts a named volume here; a volume copies this owner, so the non-root user can write).
+# Log directory. Compose mounts ./logs of the project folder here (owner uid 10001, see docker-compose.yml).
 RUN mkdir -p /app/logs && chown nimokids /app/logs
 USER nimokids
 

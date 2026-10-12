@@ -146,12 +146,16 @@ public class GameSessionServiceImpl implements GameSessionService {
             List<UUID> hard = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_4_5.name()}, basicEnglishOnly));
             List<UUID> easy = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), new String[]{AgeGroup.AGE_1_3.name()}, basicEnglishOnly));
             if (hard.size() + easy.size() < GameConstants.QUESTIONS_PER_SESSION) {
+                log.warn("Not enough questions: topic={} mode={} age={} candidates={}",
+                        topic != null ? topic.getCode() : "ALL", modeName, ageGroup, hard.size() + easy.size());
                 throw new InsufficientQuestionsException();
             }
             candidateIds = mixByAgeGroup(hard, easy);
         } else {
             candidateIds = new ArrayList<>(questionRepository.findCandidateIds(subtree, mode.getId(), ageGroups, basicEnglishOnly));
             if (candidateIds.size() < GameConstants.QUESTIONS_PER_SESSION) {
+                log.warn("Not enough questions: topic={} mode={} age={} candidates={}",
+                        topic != null ? topic.getCode() : "ALL", modeName, ageGroup, candidateIds.size());
                 throw new InsufficientQuestionsException();
             }
             Collections.shuffle(candidateIds, ThreadLocalRandom.current());
@@ -211,9 +215,14 @@ public class GameSessionServiceImpl implements GameSessionService {
                     .build());
         }
         if (accepted < GameConstants.QUESTIONS_PER_SESSION) {
+            log.warn("Not enough usable questions: topic={} mode={} age={} candidates={} usable={}",
+                    topic != null ? topic.getCode() : "ALL", modeName, ageGroup, candidateIds.size(), accepted);
             throw new InsufficientQuestionsException();
         }
         sessionRepository.save(session);
+        log.info("Session created: session={} topic={} mode={} age={} candidates={} questions={}",
+                session.getSessionId(), topic != null ? topic.getCode() : "ALL", modeName, ageGroup,
+                candidateIds.size(), accepted);
 
         activityLogService.record(ActivityEventType.START_GAME, player, session, topic, null, null, null);
         return mapper.toSessionResponse(session, currentSessionQuestion(session).orElse(null));
@@ -244,6 +253,8 @@ public class GameSessionServiceImpl implements GameSessionService {
             if (current.getTimerRestarts() < GameConstants.MAX_LISTEN_AGAIN) {
                 current.setTimerRestarts((short) (current.getTimerRestarts() + 1));
                 current.setTimerRestartedAt(clock.instant());
+                log.debug("Timer restarted: session={} question={} restarts={}", sessionId, current.getQuestionNumber(),
+                        current.getTimerRestarts());
             }
         } else if (current.getTimerStartedAt() == null) {
             current.setTimerStartedAt(clock.instant());
@@ -495,6 +506,9 @@ public class GameSessionServiceImpl implements GameSessionService {
         activityLogService.record(
                 activityEventFor(result), player, session, session.getTopic(), current.getQuestion(),
                 selected == null ? null : selected.optionId(), responseTimeMs);
+        log.info("Answer: session={} question={}/{} result={} timeMs={} score={} streak={}",
+                session.getSessionId(), current.getQuestionNumber(), session.getTotalQuestions(), result,
+                responseTimeMs, session.getScore(), session.getCurrentStreak());
 
         // The correct option is revealed only now, after the answer has been recorded.
         SnapshotOption correctOption = current.getOptionsSnapshot().stream()
@@ -550,6 +564,8 @@ public class GameSessionServiceImpl implements GameSessionService {
         AnonymousPlayer player = session.getPlayer();
         activityLogService.record(ActivityEventType.FINISH_GAME, player, session, session.getTopic(), null, null, null);
         stickerService.awardCompletionStickers(session, player, now);
+        log.info("Session completed: session={} score={}/{} maxStreak={}",
+                session.getSessionId(), session.getScore(), session.getTotalQuestions(), session.getMaxStreak());
     }
 
     private GameResultResponse buildResult(GameSession session) {

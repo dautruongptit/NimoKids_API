@@ -14,9 +14,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TopicServiceImpl implements TopicService {
@@ -30,6 +32,7 @@ public class TopicServiceImpl implements TopicService {
     public List<TopicResponse> getPlayableTopics(LanguageMode languageMode) {
         Set<UUID> playableTopicIds = Set.copyOf(
                 questionRepository.findPlayableTopicIds(GameConstants.MIN_PLAYABLE_QUESTIONS_PER_TOPIC, languageMode));
+        log.debug("Playable topics for mode {}: {} topic id(s) with enough questions", languageMode, playableTopicIds.size());
         return topicRepository.findActiveSupportingMode(languageMode.name()).stream()
                 .filter(topic -> playableTopicIds.contains(topic.getId()))
                 .map(topic -> mapper.toTopicResponse(topic, languageMode))
